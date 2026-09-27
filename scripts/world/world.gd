@@ -1,0 +1,492 @@
+class_name World
+extends Node3D
+## Runs the bakery: builds everything, spawns stations as zones are bought,
+## spawns pigeons / crows / staff, drives the camera and the objective arrow.
+
+const CAM_OFFSET := Vector3(0, 15.5, 11.2)
+const CAM_FOV := 42.0
+
+var nav := NavGrid.new()
+var player: Player
+var cam: Camera3D
+var cam_yaw := 0.0
+var cam_target := Vector3.ZERO
+var stations := {}          # id -> Station (includes "register" and "trash")
+var station_list: Array[Station] = []
+var zones := {}             # id -> BuyZone
+var workers: Array[Worker] = []
+var pigeons: Array[Node] = []
+var crows: Array[Node] = []
+var carriers: Array[Carrier] = []
+var register: Register
+var objectives: Objectives
+var company_label: Label3D
+var menu_mode := true
+
+var _gate: Node3D
+var _arrow: MeshInstance3D
+var _ground_arrow: MeshInstance3D
+var _spawn_t := 1.0
+var _rush_t := 160.0
+var _crow_t := 80.0
+var _obj_t := 0.0
+var _pan_target := Vector3.INF
+var _pan_time := 0.0
+var _orbit_t := 0.0
+var _shake := 0.0
+var _t := 0.0
+
+
+func _ready() -> void:
+	Game.world = self
+	ItemPile.fx_root = self
+	Fx.root = self
+	var built := WorldBuilder.build(self, nav)
+	_gate = built.get("gate", null)
+	# pre-built: register + trash
+	register = Register.new()
+	add_child(register)
+	register.setup(self, {"id": "register", "pos": Layout.REGISTER_POS})
+	_register_station(register)
+	var trash := TrashBin.new()
+	add_child(trash)
+	trash.setup(self, {"id": "trash", "pos": Vector2(Layout.X_MILL, -13.4)})
+	_register_station(trash)
+	for z in Layout.ZONES:
+		if Game.is_unlocked(str(z["id"])):
+			_spawn_station(z, false)
+	for id in Game.station_state:
+		if stations.has(id):
+			(stations[id] as Station).load_state(Game.station_state[id])
+	_refresh_zones(false)
+	# player
+	player = Player.new()
+	player.name = "Player"
+	player.world = self
+	add_child(player)
+	var sp := Game.player_pos if Game.player_pos != Vector2.INF else Layout.PLAYER_SPAWN
+	player.global_position = Vector3(sp.x, 0, sp.y)
+	carriers.append(player)
+	for z in Layout.ZONES:
+		if str(z["kind"]) == "hire" and Game.is_unlocked(str(z["id"])):
+			_spawn_worker(z, false)
+	# camera
+	cam = Camera3D.new()
+	cam.fov = CAM_FOV
+	cam.near = 0.3
+	cam.far = 250.0
+	add_child(cam)
+	cam.current = true
+	cam_target = player.global_position
+	_place_camera(1.0)
+	# guidance arrows
+	_arrow = MeshBuilder.node(Models.arrow_mesh(), self)
+	_arrow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_arrow.visible = false
+	_ground_arrow = MeshInstance3D.new()
+	var q := PlaneMesh.new()
+	q.size = Vector2(0.9, 0.9)
+	_ground_arrow.mesh = q
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = Items.icon("fx_ground_arrow")
+	m.albedo_color = Color(1.0, 0.9, 0.2, 0.9)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_ground_arrow.material_override = m
+	_ground_arrow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_ground_arrow.visible = false
+	add_child(_ground_arrow)
+	objectives = Objectives.new(self)
+	Game.zone_unlocked.connect(_on_unlocked)
+	Game.flag_set.connect(func(_f: String) -> void: _refresh_zones(true))
+	Game.company_changed.connect(_on_company_changed)
+	_apply_dev_camera()
+
+
+func _register_station(s: Station) -> void:
+	stations[s.id] = s
+	station_list.append(s)
+
+
+func _spawn_station(z: Dictionary, animate: bool) -> Station:
+	var kind := str(z["kind"])
+	var s: Station = null
+	match kind:
+		"field":
+			s = Field.new()
+		"machine":
+			s = Machine.new()
+		"shelf":
+			s = Shelf.new()
+		"table":
+			s = CafeTable.new()
+		"office":
+			s = Office.new()
+		"decor", "statue":
+			s = Decor.new()
+		"land":
+			_open_backlot(animate)
+			return null
+		_:
+			return null
+	add_child(s)
+	s.setup(self, z)
+	_register_station(s)
+	if animate:
+		Fx.pop_in(s, 0.5)
+		_push_player_out.call_deferred()
+	return s
+
+
+## A station that pops up under the player shoves them to the nearest free spot.
+func _push_player_out() -> void:
+	if player == null:
+		return
+	var c := nav.cell(player.global_position)
+	if nav.is_free(c):
+		return
+	var p := nav.to_world(nav.nearest_free(c))
+	var tw := create_tween()
+	tw.tween_property(player, "global_position", p, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+func _spawn_worker(z: Dictionary, animate: bool) -> Worker:
+	var wk := Worker.new()
+	wk.name = "Worker_" + str(z["id"])
+	add_child(wk)
+	var role := str(z["role"])
+	var at := Vector3.ZERO
+	if stations.has("office") and animate:
+		at = (stations["office"] as Office).door_pos()
+	else:
+		var p: Vector2 = z["pos"]
+		at = Vector3(p.x, 0, p.y)
+	wk.setup(self, role, str(z["station"]), at)
+	workers.append(wk)
+	carriers.append(wk)
+	if animate:
+		Fx.poof(at + Vector3(0, 0.6, 0), Color(1, 1, 1), 16, 0.3)
+		Fx.pop_in(wk, 0.4)
+	return wk
+
+
+func _open_backlot(animate: bool) -> void:
+	if _gate != null and is_instance_valid(_gate):
+		if animate:
+			Fx.poof(_gate.global_position + Vector3(0, 0.6, 0), Color(0.9, 0.7, 0.5), 20, 0.35)
+		_gate.queue_free()
+		_gate = null
+	nav.set_line(Vector2(-1.3, 7.5), Vector2(1.3, 7.5), false, 0.35)
+
+
+## Creates buy zones that just became visible. Returns the new ones.
+func _refresh_zones(animate: bool) -> Array[BuyZone]:
+	var fresh: Array[BuyZone] = []
+	for z in Layout.ZONES:
+		var id := str(z["id"])
+		if zones.has(id) or not Game.zone_visible(z):
+			continue
+		var bz := BuyZone.new()
+		add_child(bz)
+		bz.setup(self, z)
+		zones[id] = bz
+		fresh.append(bz)
+		if animate:
+			Fx.pop_in(bz, 0.45, 0.35 + fresh.size() * 0.12)
+	return fresh
+
+
+func _on_unlocked(id: String) -> void:
+	var z := Layout.zone(id)
+	if z.is_empty():
+		return
+	var pos := Layout.v3(z["pos"])
+	if zones.has(id):
+		(zones[id] as Node).queue_free()
+		zones.erase(id)
+	var kind := str(z["kind"])
+	Game.log_line("[unlock] t=%4.0fs %-18s money=%d served=%d pigeons=%d" % [_t, id, Game.money, int(Game.stats["served"]), pigeons.size()])
+	if kind == "hire":
+		_spawn_worker(z, true)
+	else:
+		_spawn_station(z, true)
+	Sfx.play("unlock", -3.0)
+	Sfx.play("thud", -6.0)
+	Fx.confetti(pos + Vector3(0, 0.5, 0), 50)
+	Fx.float_text(pos + Vector3(0, 2.8, 0), "UNLOCKED!", Color(1, 0.9, 0.3), 80)
+	_shake = 0.25
+	if kind == "shelf" and Game.hud != null:
+		var product := str(z["product"])
+		Game.hud.call("big_card", "New product!", "%s  $%d" % [Items.title(product), Items.price(product)],
+			"Pigeons will now come for %s." % Items.title(product).to_lower(), product)
+		Sfx.play("fanfare", -4.0)
+	elif kind == "hire" and Game.hud != null:
+		Game.hud.call("toast", "%s hired!" % str(z["name"]).replace("Hire ", ""), Layout.zone_icon(z))
+	elif kind == "land" and Game.hud != null:
+		Game.hud.call("big_card", "More land!", "The Back Lot", "Room for more fields and landmarks.", "land")
+		Sfx.play("fanfare", -4.0)
+	elif kind == "statue":
+		_win()
+	var fresh := _refresh_zones(true)
+	if not fresh.is_empty() and Game.playing:
+		var tgt := fresh[0].global_position
+		if tgt.distance_to(player.global_position) > 8.0:
+			pan_to(tgt, 1.6)
+
+
+func pan_to(p: Vector3, secs: float) -> void:
+	_pan_target = p
+	_pan_time = secs
+	player.locked = true
+	Sfx.play("whoosh", -8.0)
+
+
+func _win() -> void:
+	Game.set_flag("won")
+	for i in 6:
+		var t := get_tree().create_timer(0.3 * i, false)
+		var p := Layout.v3(Layout.zone("statue")["pos"]) + Vector3(randf_range(-4, 4), 1.0, randf_range(-3, 3))
+		t.timeout.connect(func() -> void: Fx.confetti(p, 70, 60.0))
+	Sfx.play("fanfare", 0.0)
+	if Game.hud != null:
+		var t2 := get_tree().create_timer(2.5, false)
+		t2.timeout.connect(func() -> void: Game.hud.call("show_win"))
+
+
+func _on_company_changed(n: String) -> void:
+	if company_label != null:
+		WorldBuilder.fit_sign(company_label, n)
+
+
+# ------------------------------------------------------------ queries ----
+func shelves() -> Array[Shelf]:
+	var out: Array[Shelf] = []
+	for s in station_list:
+		if s is Shelf:
+			out.append(s)
+	return out
+
+
+func tables() -> Array:
+	var out: Array = []
+	for s in station_list:
+		if s is CafeTable:
+			out.append(s)
+	return out
+
+
+func find_seat() -> Array:
+	var ts := tables()
+	ts.shuffle()
+	for t in ts:
+		var i := (t as CafeTable).free_seat()
+		if i >= 0:
+			return [t, i]
+	return []
+
+
+func popularity() -> float:
+	var p := 1.0 + 0.08 * tables().size()
+	for z in Layout.ZONES:
+		if z.has("popularity") and Game.is_unlocked(str(z["id"])):
+			p += float(z["popularity"])
+	return p
+
+
+func notify(ev: String, _st: Node) -> void:
+	if ev == "collected":
+		Game.set_flag("first_cash")
+
+
+func pigeon_gone(p: Node) -> void:
+	pigeons.erase(p)
+
+
+func crow_gone(c: Node) -> void:
+	crows.erase(c)
+
+
+func hired_count() -> int:
+	return workers.size()
+
+
+# --------------------------------------------------------------- loop ----
+func _physics_process(delta: float) -> void:
+	for a in carriers:
+		for s in station_list:
+			s.service(a, delta)
+	if Game.playing and not player.locked:
+		for id in zones:
+			(zones[id] as BuyZone).service(player, delta)
+		for c in crows:
+			if is_instance_valid(c) and bool(c.call("try_scare", player.global_position)):
+				Game.stats["shooed"] = int(Game.stats["shooed"]) + 1
+				var bonus := 5 * shelves().size()
+				Game.add_money(bonus)
+				Fx.float_text(player.global_position + Vector3(0, 2.6, 0), "+$%d" % bonus, Color(1, 0.9, 0.3), 60)
+
+
+func _process(delta: float) -> void:
+	_t += delta
+	_update_spawning(delta)
+	_obj_t -= delta
+	if _obj_t <= 0.0:
+		_obj_t = 0.15
+		objectives.update()
+		if Game.hud != null:
+			Game.hud.call("set_objective", objectives.text, objectives.icon, objectives.step_label)
+	_update_arrows(delta)
+	_update_camera(delta)
+	if Game.playing:
+		Game.player_pos = Vector2(player.global_position.x, player.global_position.z)
+
+
+func _update_spawning(delta: float) -> void:
+	var sh := shelves()
+	if sh.is_empty():
+		return
+	var cap := 3 + sh.size() * 3 + tables().size()
+	# rush hour
+	_rush_t -= delta
+	if _rush_t <= 0.0:
+		_rush_t = randf_range(150.0, 240.0)
+		if sh.size() >= 2 and Game.tut >= 9 and Game.playing:
+			if Game.hud != null:
+				Game.hud.call("toast", "PIGEON RUSH!", "ui_star")
+			Sfx.coo(-2.0)
+			for i in 6:
+				var t := get_tree().create_timer(0.35 * i, false)
+				t.timeout.connect(func() -> void: _spawn_pigeon(sh.pick_random() as Shelf))
+	# crows
+	_crow_t -= delta
+	if _crow_t <= 0.0:
+		_crow_t = randf_range(70.0, 110.0)
+		if Game.is_unlocked("hire_cashier") and crows.is_empty() and Game.playing:
+			var candidates: Array[Shelf] = []
+			for s in sh:
+				if s.stock() >= 3:
+					candidates.append(s)
+			if not candidates.is_empty():
+				var crow := Crow.new()
+				add_child(crow)
+				crow.setup(self, candidates.pick_random() as Shelf)
+				crows.append(crow)
+				if Game.hud != null:
+					Game.hud.call("toast", "A crow is stealing from your shelf!", "ui_close")
+	if pigeons.size() >= cap:
+		return
+	_spawn_t -= delta
+	if _spawn_t > 0.0:
+		return
+	# tutorial: one customer at a time until the first sale
+	if Game.tut < 8 and pigeons.size() >= 1:
+		_spawn_t = 1.0
+		return
+	_spawn_t = randf_range(4.0, 6.5) / (popularity() * (1.0 + 0.3 * (sh.size() - 1)))
+	var options: Array[Shelf] = []
+	for s in sh:
+		if s.has_room_in_queue():
+			options.append(s)
+	if options.is_empty():
+		return
+	_spawn_pigeon(options.pick_random() as Shelf)
+
+
+func _spawn_pigeon(s: Shelf) -> void:
+	if s == null or not s.has_room_in_queue():
+		return
+	var n_products := shelves().size()
+	var qty := randi_range(1, clampi(1 + n_products, 2, 5))
+	if Game.tut < 8:
+		qty = 2
+	var vip := Game.is_unlocked("golden_perch") and randf() < 0.12
+	if vip:
+		qty += 1
+	var p := Pigeon.new()
+	add_child(p)
+	p.setup(self, s, register, qty, vip)
+	pigeons.append(p)
+
+
+func _update_arrows(_delta: float) -> void:
+	var tgt := objectives.target
+	var show := tgt != Vector3.INF and Game.playing
+	_arrow.visible = show
+	if not show:
+		_ground_arrow.visible = false
+		return
+	_arrow.global_position = tgt + Vector3(0, 3.1 + absf(sin(_t * 4.0)) * 0.45, 0)
+	_arrow.rotation.y = cam_yaw
+	var to := Vector3(tgt.x - player.global_position.x, 0, tgt.z - player.global_position.z)
+	var d := to.length()
+	_ground_arrow.visible = d > 3.2
+	if _ground_arrow.visible:
+		var dir := to / d
+		_ground_arrow.global_position = player.global_position + dir * 1.35 + Vector3(0, 0.06, 0)
+		_ground_arrow.rotation.y = atan2(-dir.x, -dir.z)
+
+
+func _view_scale() -> float:
+	var vs := get_viewport().get_visible_rect().size
+	var aspect := vs.x / maxf(vs.y, 1.0)
+	if aspect >= 1.3:
+		return 1.0
+	return clampf(1.0 + (1.3 - aspect) * 0.9, 1.0, 1.9)
+
+
+func _place_camera(k: float) -> void:
+	var off := CAM_OFFSET.rotated(Vector3.UP, cam_yaw) * _view_scale()
+	var shake := Vector3.ZERO
+	if _shake > 0.0:
+		shake = Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * _shake * 0.25
+	var desired := cam_target + off
+	cam.global_position = cam.global_position.lerp(desired, k) + shake
+	cam.look_at(cam.global_position - off, Vector3.UP)
+
+
+func _update_camera(delta: float) -> void:
+	_shake = maxf(0.0, _shake - delta)
+	if menu_mode:
+		_orbit_t += delta
+		var center := Vector3(-3.0, 0, -8.0)
+		var a := _orbit_t * 0.08
+		var off := Vector3(sin(a) * 26.0, 19.0, cos(a) * 26.0)
+		cam.global_position = center + off
+		cam.look_at(center, Vector3.UP)
+		return
+	if _pan_time > 0.0:
+		_pan_time -= delta
+		cam_target = cam_target.lerp(_pan_target, clampf(delta * 4.0, 0.0, 1.0))
+		if _pan_time <= 0.0:
+			_pan_target = Vector3.INF
+			player.locked = false
+	else:
+		cam_target = cam_target.lerp(player.global_position, clampf(delta * 6.0, 0.0, 1.0))
+	_place_camera(clampf(delta * 10.0, 0.0, 1.0))
+
+
+func start_play() -> void:
+	menu_mode = false
+	Game.playing = true
+	cam_target = player.global_position
+	_place_camera(1.0)
+
+
+func _apply_dev_camera() -> void:
+	var c := str(Game.dev["cam"])
+	if c.is_empty():
+		return
+	# --cam x,z  : park the follow camera over a point (for screenshots)
+	var parts := c.split(",")
+	if parts.size() >= 2:
+		player.global_position = Vector3(float(parts[0]), 0, float(parts[1]))
+
+
+## Snapshot of every station's contents for the save file.
+func collect_state() -> void:
+	var d := {}
+	for s in station_list:
+		var st := s.save_state()
+		if not st.is_empty():
+			d[s.id] = st
+	Game.station_state = d

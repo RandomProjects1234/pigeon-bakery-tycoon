@@ -1,0 +1,7 @@
+# Godot
+.godot/
+*.translation
+# build output (the exe is attached to GitHub releases instead)
+build/
+# dev screenshots
+shots/
