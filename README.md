@@ -5,6 +5,8 @@ A mobile-style "arcade idle" tycoon (like the playable ads) built in Godot 4.4. 
 ![Title screen](docs/title.png)
 ![Gameplay](docs/gameplay.png)
 
+**Play in your browser (phones too):** https://randomprojects1234.github.io/pigeon-bakery-tycoon/
+
 **Download:** grab `Pigeon Bakery Tycoon.exe` from the [latest release](../../releases/latest). It's one file with nothing to install (Windows, 64-bit).
 
 ## Play
@@ -72,6 +74,14 @@ Regenerate assets:
 3. `godot --path . -- --bake-icons`
 4. `py -3.13 tools/outline_icons.py`
 5. `godot --headless --import --path .`
+
+## Web build
+
+The web version is Godot's built-in Web export: the `Web` preset in `export_presets.cfg`, with no thread support so it runs on GitHub Pages. Export to `build/web/`, then push that folder (plus an empty `.nojekyll`) to the `gh-pages` branch.
+
+```
+godot --headless --path . --export-release "Web" build/web/index.html
+```
 
 ## Dev flags (after `--`)
 

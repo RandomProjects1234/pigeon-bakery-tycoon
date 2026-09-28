@@ -234,8 +234,26 @@ func _process(delta: float) -> void:
 			_money_shown = target
 		_money_label.text = Game.fmt(int(round(_money_shown)))
 	_btn_upgrades.visible = Game.is_unlocked("office")
+	_adapt_layout()
 	_update_edge_arrow()
 	_update_hand(delta)
+
+
+var _portrait := false
+
+
+## Phones held upright: shrink the base canvas and move the objective banner
+## under the badge / cash row so nothing overlaps.
+func _adapt_layout() -> void:
+	var ws := get_window().size
+	var portrait := ws.y > ws.x
+	if portrait == _portrait:
+		return
+	_portrait = portrait
+	get_window().content_scale_size = Vector2i(720, 720) if portrait else Vector2i(1280, 720)
+	_obj_panel.offset_top = 124 if portrait else 18
+	_toasts.offset_top = 200 if portrait else 96
+	_center_objective()
 
 
 func _update_hand(delta: float) -> void:
@@ -313,10 +331,17 @@ func set_objective(text: String, icon: String, step: String) -> void:
 	_obj_label.text = text
 	_obj_icon.texture = Items.icon(icon) if not icon.is_empty() else null
 	_obj_step.text = step
+	_center_objective()
+	_pop_later(_obj_panel, 0.85)
+
+
+func _center_objective() -> void:
 	_obj_panel.offset_left = 0
 	_obj_panel.offset_right = 0
 	_obj_panel.reset_size()
-	_pop_later(_obj_panel, 0.85)
+	var w := _obj_panel.get_combined_minimum_size().x
+	_obj_panel.offset_left = -w * 0.5
+	_obj_panel.offset_right = w * 0.5
 
 
 func _pop_later(c: Control, from: float) -> void:
