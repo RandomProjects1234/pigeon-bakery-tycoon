@@ -12,7 +12,7 @@ Run with Python 3.13 (needs Pillow):  py -3.13 tools/gen_art.py
 import math
 import os
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, "assets")
@@ -513,8 +513,38 @@ def card_tex():
     return im.resize((W, H), Image.LANCZOS)
 
 
+def nunito(size, weight=900):
+    f = ImageFont.truetype(os.path.join(ASSETS, "fonts", "Nunito-Variable.ttf"), size)
+    f.set_variation_by_axes([weight])
+    return f
+
+
+def outlined_text(d, xy, text, font, fill, outline, width):
+    d.text(xy, text, font=font, fill=fill, anchor="mm", stroke_width=width, stroke_fill=outline)
+
+
+def make_splash():
+    """Loading screen / boot splash: the pigeon logo over the game title."""
+    W, H = 1200, 1000
+    S = 2
+    im = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
+    badge = make_badge(560 * S // 1)
+    im.alpha_composite(badge.resize((560 * S, 560 * S), Image.LANCZOS), ((W * S - 560 * S) // 2, 20 * S))
+    d = ImageDraw.Draw(im)
+    outlined_text(d, (W * S // 2, 680 * S), "PIGEON BAKERY", nunito(126 * S), (255, 168, 40, 255), (255, 255, 255, 255), 14 * S)
+    # red TYCOON ribbon
+    rw, rh = 420 * S, 110 * S
+    cx, cy = W * S // 2, 830 * S
+    d.rounded_rectangle((cx - rw // 2 - 8 * S, cy - rh // 2 - 8 * S, cx + rw // 2 + 8 * S, cy + rh // 2 + 8 * S), 26 * S, fill=(255, 255, 255, 255))
+    d.rounded_rectangle((cx - rw // 2, cy - rh // 2, cx + rw // 2, cy + rh // 2), 20 * S, fill=(237, 84, 89, 255))
+    outlined_text(d, (cx, cy - 4 * S), "TYCOON", nunito(84 * S), (255, 255, 255, 255), INK, 7 * S)
+    outlined_text(d, (cx, 950 * S), "Loading the flock...", nunito(44 * S, 800), (255, 255, 255, 255), INK, 5 * S)
+    return im.resize((W, H), Image.LANCZOS)
+
+
 def main():
     make_logo_files()
+    save(make_splash(), "logo", "splash.png")
     icons = {
         "ui_gear": gear(), "ui_up": arrow_up(), "ui_speed": shoe(), "ui_capacity": boxes(),
         "ui_profit": coin(), "ui_staff_speed": person((255, 150, 60, 255), "bolt"),

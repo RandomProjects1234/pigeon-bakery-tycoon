@@ -107,4 +107,4 @@ godot --headless --path . --fixed-fps 60 -- --fresh --auto --log --timescale 3 -
 
 ## License
 
-MIT, see [LICENSE](LICENSE). The pigeon in the logo is a real pigeon who did not sign anything.
+MIT, see [LICENSE](LICENSE). The bundled font is [Nunito](https://github.com/googlefonts/nunito), used under the SIL Open Font License (`assets/fonts/OFL.txt`). The pigeon in the logo is a real pigeon who did not sign anything.

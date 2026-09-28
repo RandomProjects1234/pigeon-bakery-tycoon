@@ -9,14 +9,16 @@ static var _puff_mat: StandardMaterial3D
 static var _spark_mat: StandardMaterial3D
 
 
-## Chunky rounded system font (falls back to Godot's default elsewhere).
+## Nunito Black: an open-licensed (OFL) chunky rounded font bundled in
+## assets/fonts, so the EXE and the web build look identical.
 static func font() -> Font:
 	if _font == null:
-		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Segoe UI Black", "Arial Rounded MT Bold", "Arial Black", "Verdana"])
-		f.font_weight = 900
-		f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
-		_font = f
+		var ff: FontFile = load("res://assets/fonts/Nunito-Variable.ttf")
+		var fv := FontVariation.new()
+		fv.base_font = ff
+		var ts := TextServerManager.get_primary_interface()
+		fv.variation_opentype = {ts.name_to_tag("wght"): 900}
+		_font = fv
 	return _font
 
 
