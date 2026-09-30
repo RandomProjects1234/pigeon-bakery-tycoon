@@ -22,8 +22,10 @@ var register: Register
 var objectives: Objectives
 var company_label: Label3D
 var menu_mode := true
+var military: Military
+var security: Security
 
-var _gate: Node3D
+var _gates := {}
 var _arrow: MeshInstance3D
 var _ground_arrow: MeshInstance3D
 var _spawn_t := 1.0
@@ -35,14 +37,22 @@ var _pan_time := 0.0
 var _orbit_t := 0.0
 var _shake := 0.0
 var _t := 0.0
+var _intro_t := 0.0
+var _intro_running := false
+var _attack_cd := 0.0
 
 
 func _ready() -> void:
 	Game.world = self
 	ItemPile.fx_root = self
 	Fx.root = self
+	military = Military.new(self)
+	security = Security.new(self)
+	# saves that finished the game before the military update still get General Coo
+	if Game.is_unlocked("statue"):
+		Game.flags["won"] = true
 	var built := WorldBuilder.build(self, nav)
-	_gate = built.get("gate", null)
+	_gates = built.get("gates", {})
 	# pre-built: register + trash
 	register = Register.new()
 	add_child(register)
@@ -50,7 +60,7 @@ func _ready() -> void:
 	_register_station(register)
 	var trash := TrashBin.new()
 	add_child(trash)
-	trash.setup(self, {"id": "trash", "pos": Vector2(Layout.X_MILL, -13.4)})
+	trash.setup(self, {"id": "trash", "pos": Layout.TRASH_POS})
 	_register_station(trash)
 	for z in Layout.ZONES:
 		if Game.is_unlocked(str(z["id"])):
@@ -124,8 +134,14 @@ func _spawn_station(z: Dictionary, animate: bool) -> Station:
 			s = Office.new()
 		"decor", "statue":
 			s = Decor.new()
+		"depot":
+			s = Depot.new()
+		"security":
+			s = SecurityHQ.new()
+		"turret":
+			s = Turret.new()
 		"land":
-			_open_backlot(animate)
+			_open_gate(str(z["id"]), animate)
 			return null
 		_:
 			return null
@@ -156,7 +172,11 @@ func _spawn_worker(z: Dictionary, animate: bool) -> Worker:
 	add_child(wk)
 	var role := str(z["role"])
 	var at := Vector3.ZERO
-	if stations.has("office") and animate:
+	if role == "guard" and stations.has("security_hq") and animate:
+		at = (stations["security_hq"] as SecurityHQ).door_pos()
+	elif role == "runner" and stations.has("military_depot") and animate:
+		at = (stations["military_depot"] as Node3D).global_position + Vector3(0, 0, 3.2)
+	elif stations.has("office") and animate:
 		at = (stations["office"] as Office).door_pos()
 	else:
 		var p: Vector2 = z["pos"]
@@ -170,13 +190,16 @@ func _spawn_worker(z: Dictionary, animate: bool) -> Worker:
 	return wk
 
 
-func _open_backlot(animate: bool) -> void:
-	if _gate != null and is_instance_valid(_gate):
+func _open_gate(id: String, animate: bool) -> void:
+	var gate: Node3D = _gates.get(id, null)
+	if gate != null and is_instance_valid(gate):
 		if animate:
-			Fx.poof(_gate.global_position + Vector3(0, 0.6, 0), Color(0.9, 0.7, 0.5), 20, 0.35)
-		_gate.queue_free()
-		_gate = null
-	nav.set_line(Vector2(-1.3, 7.5), Vector2(1.3, 7.5), false, 0.35)
+			Fx.poof(gate.global_position + Vector3(0, 0.6, 0), Color(0.9, 0.7, 0.5), 20, 0.35)
+		gate.queue_free()
+	_gates.erase(id)
+	var g: Array = Layout.GATES.get(id, [])
+	if g.size() == 2:
+		nav.set_line(g[0], g[1], false, 0.35)
 
 
 ## Creates buy zones that just became visible. Returns the new ones.
@@ -223,7 +246,8 @@ func _on_unlocked(id: String) -> void:
 	elif kind == "hire" and Game.hud != null:
 		Game.hud.call("toast", "%s hired!" % str(z["name"]).replace("Hire ", ""), Layout.zone_icon(z))
 	elif kind == "land" and Game.hud != null:
-		Game.hud.call("big_card", "More land!", "The Back Lot", "Room for more fields and landmarks.", "land")
+		var blurb := "Room for more fields and landmarks." if id == "backlot" else "Build the Supply Depot for General Coo."
+		Game.hud.call("big_card", "More land!", str(z["name"]), blurb, "land")
 		Sfx.play("fanfare", -4.0)
 	elif kind == "statue":
 		_win()
@@ -232,6 +256,62 @@ func _on_unlocked(id: String) -> void:
 		var tgt := fresh[0].global_position
 		if tgt.distance_to(player.global_position) > 8.0:
 			pan_to(tgt, 1.6)
+
+
+# ------------------------------------------------ General Coo arrives --
+func _update_intro(delta: float) -> void:
+	if _intro_running or not Game.playing or not Game.has_flag("won") or Game.has_flag("general_met"):
+		return
+	if Game.hud == null or bool(Game.hud.call("is_busy")):
+		return
+	_intro_t += delta
+	if _intro_t < 5.0:
+		return
+	_intro_running = true
+	var gen := PigeonRig.new("general")
+	gen.scale = Vector3.ONE * 1.4
+	add_child(gen)
+	var land := player.global_position + Vector3(1.6, 0, 1.2)
+	var from := land + Vector3(14, 12, -10)
+	gen.global_position = from
+	Sfx.play("bugle", -2.0)
+	Sfx.play("flap", -6.0)
+	var fly := func(t: float) -> void:
+		var e := 1.0 - pow(1.0 - t, 2.0)
+		gen.global_position = from.lerp(land, e) + Vector3(0, sin(t * PI) * 2.0, 0)
+		gen.animate(0.016, 0.0, "fly" if t < 0.98 else "idle")
+	var tw := create_tween()
+	tw.tween_method(fly, 0.0, 1.0, 2.4)
+	tw.tween_callback(func() -> void:
+		gen.look_at(Vector3(player.global_position.x, 0, player.global_position.z), Vector3.UP)
+		for i in 12:
+			gen.animate(0.1, 0.0, "idle")   # settle out of the flying pose
+		_general_speech(gen))
+
+
+func _general_speech(gen: PigeonRig) -> void:
+	var lines: Array[String] = [
+		"ATTENTION, BAKER! I am General Coo of the Pigeon Army.",
+		"The Crow Clans have declared war on every pigeon in this city.",
+		"My soldiers are brave... but brave birds get HUNGRY. And your bread is the finest in the land.",
+		"Build a Supply Depot at my outpost, east of your yard. I will send you orders. BIG orders. With deadlines.",
+		"You may haggle, of course. But don't push your luck with me, baker.",
+		"And watch your back. The crows know who feeds my army. They will raid your shop, and your wallet!",
+		"Get yourself some security. Dismissed!",
+	]
+	Game.hud.call("dialog", lines, "General Coo", "portrait_general", func() -> void:
+		Game.set_flag("general_met")
+		Sfx.play("fanfare", -3.0)
+		Game.hud.call("big_card", "Military Update!", "War against the crows", "Build the Military Outpost and a Security Booth.", "military")
+		var from := gen.global_position
+		var to := from + Vector3(18, 14, -6)
+		var away := func(t: float) -> void:
+			gen.global_position = from.lerp(to, t * t)
+			gen.animate(0.016, 0.0, "fly")
+		var tw := create_tween()
+		tw.tween_method(away, 0.0, 1.0, 2.0)
+		tw.tween_callback(gen.queue_free)
+		_intro_running = false)
 
 
 func pan_to(p: Vector3, secs: float) -> void:
@@ -298,6 +378,10 @@ func notify(ev: String, _st: Node) -> void:
 		Game.set_flag("first_cash")
 
 
+func raider_gone(r: Node, escaped: bool) -> void:
+	security.raider_gone(r, escaped)
+
+
 func pigeon_gone(p: Node) -> void:
 	pigeons.erase(p)
 
@@ -315,6 +399,11 @@ func _physics_process(delta: float) -> void:
 	for a in carriers:
 		for s in station_list:
 			s.service(a, delta)
+	_attack_cd -= delta
+	if Game.playing and not security.raiders.is_empty() and _attack_cd <= 0.0:
+		if security.hit_near(player.global_position, 1.5, 1) != null:
+			_attack_cd = 0.35
+			player.rig.swing()
 	if Game.playing and not player.locked:
 		for id in zones:
 			(zones[id] as BuyZone).service(player, delta)
@@ -329,6 +418,9 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	_t += delta
 	_update_spawning(delta)
+	military.tick(delta)
+	security.tick(delta)
+	_update_intro(delta)
 	_obj_t -= delta
 	if _obj_t <= 0.0:
 		_obj_t = 0.15
@@ -345,7 +437,7 @@ func _update_spawning(delta: float) -> void:
 	var sh := shelves()
 	if sh.is_empty():
 		return
-	var cap := 3 + sh.size() * 3 + tables().size()
+	var cap := 3 + sh.size() * 4 + tables().size()
 	# rush hour
 	_rush_t -= delta
 	if _rush_t <= 0.0:
@@ -382,26 +474,40 @@ func _update_spawning(delta: float) -> void:
 	if Game.tut < 8 and pigeons.size() >= 1:
 		_spawn_t = 1.0
 		return
-	_spawn_t = randf_range(4.0, 6.5) / (popularity() * (1.0 + 0.3 * (sh.size() - 1)))
+	_spawn_t = randf_range(4.0, 6.5) / (popularity() * (1.0 + 0.45 * (sh.size() - 1)))
 	var options: Array[Shelf] = []
+	var weights: Array[float] = []
 	for s in sh:
 		if s.has_room_in_queue():
 			options.append(s)
+			# the $500 pie is a luxury: only the odd rich pigeon wants one
+			weights.append(0.1 if s.product == "pie" else 1.0)
 	if options.is_empty():
 		return
-	_spawn_pigeon(options.pick_random() as Shelf)
+	var total := 0.0
+	for w in weights:
+		total += w
+	var r := randf() * total
+	for i in options.size():
+		r -= weights[i]
+		if r <= 0.0:
+			_spawn_pigeon(options[i])
+			return
+	_spawn_pigeon(options[options.size() - 1])
 
 
 func _spawn_pigeon(s: Shelf) -> void:
 	if s == null or not s.has_room_in_queue():
 		return
 	var n_products := shelves().size()
-	var qty := randi_range(1, clampi(1 + n_products, 2, 5))
+	var qty := randi_range(1 if n_products < 4 else 2, clampi(1 + n_products, 2, 6))
 	if Game.tut < 8:
 		qty = 2
 	var vip := Game.is_unlocked("golden_perch") and randf() < 0.12
 	if vip:
 		qty += 1
+	if s.product == "pie":
+		qty = 1
 	var p := Pigeon.new()
 	add_child(p)
 	p.setup(self, s, register, qty, vip)

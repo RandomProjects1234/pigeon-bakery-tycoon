@@ -117,6 +117,19 @@ static func _build_item(t: String) -> ArrayMesh:
 				var z := -0.025 + (k / 3) * 0.05
 				var tilt: Vector3 = tilts[k]
 				b.box(Vector3(0.032, 0.16, 0.032), Vector3(x, 0.24 + (k % 2) * 0.02, z), fry, tilt)
+		"pie":
+			# golden pie with a lattice top and bits of every ingredient
+			b.cyl(0.24, 0.2, 0.1, Vector3(0, 0.05, 0), Color(0.82, 0.5, 0.22), Vector3.ZERO, 16)
+			b.cyl(0.25, 0.25, 0.03, Vector3(0, 0.1, 0), Color(0.93, 0.66, 0.3), Vector3.ZERO, 16)
+			b.cyl(0.21, 0.21, 0.02, Vector3(0, 0.115, 0), Color(0.62, 0.2, 0.25), Vector3.ZERO, 16)
+			for k in 3:
+				var off := -0.1 + k * 0.1
+				b.box(Vector3(0.4 - absf(off) * 0.8, 0.02, 0.035), Vector3(0, 0.13, off), Color(0.98, 0.76, 0.4))
+				b.box(Vector3(0.035, 0.02, 0.4 - absf(off) * 0.8), Vector3(off, 0.135, 0), Color(0.98, 0.76, 0.4))
+			b.sphere(0.03, Vector3(0.05, 0.14, 0.05), Color(0.93, 0.22, 0.16))
+			b.sphere(0.028, Vector3(-0.05, 0.14, -0.05), Color(1.0, 0.82, 0.15))
+			b.sphere(0.028, Vector3(0.05, 0.14, -0.05), Color(0.78, 0.57, 0.33))
+			b.sphere(0.028, Vector3(-0.05, 0.14, 0.05), Color(0.35, 0.7, 0.3))
 		"cash":
 			b.box(Vector3(0.34, 0.06, 0.18), Vector3(0, 0.03, 0), Color(0.46, 0.82, 0.36))
 			b.box(Vector3(0.26, 0.062, 0.12), Vector3(0, 0.03, 0), Color(0.36, 0.7, 0.3))

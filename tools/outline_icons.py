@@ -5,7 +5,8 @@ import os
 from PIL import Image, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ITEMS = ["wheat", "sunflower", "flour", "tomato", "potato", "bread", "seeds", "croissant", "pizza", "fries", "cash"]
+ITEMS = ["wheat", "sunflower", "flour", "tomato", "potato", "bread", "seeds", "croissant", "pizza", "fries", "cash",
+         "pie", "portrait_general", "portrait_crow"]
 INK = (43, 38, 52)
 
 for name in ITEMS:

@@ -408,6 +408,50 @@ def perch_icon():
     return g.done()
 
 
+def military_icon():
+    g = G()
+    g.poly([(50, 6), (88, 20), (84, 60), (50, 94), (16, 60), (12, 20)], (110, 135, 80, 255))
+    pts = []
+    for i in range(10):
+        a = -math.pi / 2 + i * math.pi / 5
+        r = 26 if i % 2 == 0 else 11
+        pts.append((50 + math.cos(a) * r, 48 + math.sin(a) * r))
+    g.poly(pts, (255, 210, 60, 255), w=3)
+    return g.done()
+
+
+def security_icon():
+    g = G()
+    g.poly([(50, 6), (88, 18), (84, 58), (50, 94), (16, 58), (12, 18)], (60, 90, 170, 255))
+    g.poly([(50, 22), (72, 30), (69, 56), (50, 76), (31, 56), (28, 30)], (255, 215, 70, 255), w=3)
+    return g.done()
+
+
+def turret_icon():
+    g = G()
+    g.line([(50, 92), (50, 56)], (150, 95, 55, 255), 12)
+    g.line([(50, 58), (28, 18)], (150, 95, 55, 255), 11)
+    g.line([(50, 58), (72, 18)], (150, 95, 55, 255), 11)
+    g.line([(28, 22), (50, 40), (72, 22)], (220, 70, 70, 255), 5)
+    g.ell(42, 32, 58, 48, (250, 220, 120, 255), w=3)
+    return g.done()
+
+
+def guard_icon():
+    g = G()
+    g.rect(18, 40, 82, 68, (40, 60, 110, 255), r=10)
+    g.rect(10, 62, 90, 76, (25, 25, 35, 255), r=4)
+    g.rect(40, 44, 60, 62, (255, 210, 60, 255), r=3, w=3)
+    return g.done()
+
+
+def runner_icon():
+    g = G()
+    g.ell(14, 26, 86, 86, (100, 125, 70, 255))
+    g.rect(8, 60, 92, 70, (80, 100, 55, 255), r=3)
+    return g.done()
+
+
 def bubble():
     """Speech bubble for pigeon orders (white, soft outline, tail down)."""
     size = 128
@@ -559,6 +603,8 @@ def main():
         "fx_bubble": bubble(), "fx_ground_arrow": ground_arrow(), "fx_ring": corner_ring(),
         "fx_dot": soft_dot(), "fx_sparkle": sparkle(), "fx_pad": pad_tex(), "fx_zone": zone_tex(),
         "fx_fill": fill_tex(), "fx_card": card_tex(),
+        "military": military_icon(), "security": security_icon(), "turret": turret_icon(),
+        "hire_guard": guard_icon(), "hire_runner": runner_icon(),
     }
     for name, im in icons.items():
         save(im, "icons", name + ".png")

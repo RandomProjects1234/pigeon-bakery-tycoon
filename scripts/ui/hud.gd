@@ -31,6 +31,13 @@ var _hand: Control
 var _hand_t := 0.0
 var _big_card: Control = null
 var _t := 0.0
+var _dialog: Control = null
+var _order_panel: PanelContainer
+var _order_title: Label
+var _order_rows: VBoxContainer
+var _order_sig := ""
+var _raid_panel: PanelContainer
+var _raid_label: Label
 
 const JOY_R := 70.0
 
@@ -61,6 +68,7 @@ func _ready() -> void:
 	_edge_arrow.visible = false
 	root.add_child(_edge_arrow)
 	_build_hand()
+	_build_military_panels()
 	Game.money_changed.connect(_on_money)
 	Game.upgrades_changed.connect(_refresh_upgrades)
 	Game.zone_unlocked.connect(func(_id: String) -> void: _refresh_level())
@@ -237,6 +245,7 @@ func _process(delta: float) -> void:
 	_adapt_layout()
 	_update_edge_arrow()
 	_update_hand(delta)
+	_update_military_panels()
 
 
 var _portrait := false
@@ -454,6 +463,11 @@ func _open_modal(name_: String, title: String, width := 640.0) -> VBoxContainer:
 	return vb
 
 
+## True while something is covering the screen (so offers/intros wait).
+func is_busy() -> bool:
+	return _modal != null or _dialog != null or not Game.playing
+
+
 func close_modal() -> void:
 	if _modal != null and is_instance_valid(_modal):
 		_modal.queue_free()
@@ -657,7 +671,7 @@ func show_win() -> void:
 	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	vb.add_child(badge)
-	var l := UiKit.dark_label("%s is the most famous bakery in pigeon history.\nThe Founder's Statue now watches over the flock." % Game.company, 21)
+	var l := UiKit.dark_label("%s is the most famous bakery in pigeon history.\nThe Founder's Statue now watches over the flock.\n...but keep playing. Someone from the army is on the way." % Game.company, 21)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
 	l.custom_minimum_size = Vector2(580, 0)
@@ -681,3 +695,253 @@ func show_win() -> void:
 	var hint := UiKit.label("A new branch starts fresh, but every pigeon pays +50% more there.", 16, Color(0.5, 0.46, 0.6), 0)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(hint)
+
+
+# ------------------------------------------------ military + security --
+func _build_military_panels() -> void:
+	_order_panel = PanelContainer.new()
+	_order_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_order_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_order_panel.offset_right = -16
+	_order_panel.offset_left = -16
+	_order_panel.offset_top = 92
+	_order_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_order_panel.add_theme_stylebox_override("panel", UiKit.panel_style(Color(0.26, 0.33, 0.2, 0.93), 20, 3, Color(0.95, 0.82, 0.35)))
+	root.add_child(_order_panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 2)
+	_order_panel.add_child(vb)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 6)
+	vb.add_child(hb)
+	hb.add_child(UiKit.tex("military", 34))
+	_order_title = UiKit.label("", 20, Color(1, 0.95, 0.7), 6)
+	hb.add_child(_order_title)
+	_order_rows = VBoxContainer.new()
+	_order_rows.add_theme_constant_override("separation", 0)
+	vb.add_child(_order_rows)
+	_order_panel.visible = false
+	_raid_panel = PanelContainer.new()
+	_raid_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_raid_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_raid_panel.offset_top = 88
+	_raid_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_raid_panel.add_theme_stylebox_override("panel", UiKit.panel_style(Color(0.75, 0.12, 0.15, 0.92), 20, 3, Color(1, 1, 1)))
+	root.add_child(_raid_panel)
+	var rh := HBoxContainer.new()
+	rh.add_theme_constant_override("separation", 8)
+	_raid_panel.add_child(rh)
+	rh.add_child(UiKit.tex("portrait_crow", 40))
+	_raid_label = UiKit.label("", 24, Color(1, 1, 1), 8)
+	rh.add_child(_raid_label)
+	_raid_panel.visible = false
+
+
+func _update_military_panels() -> void:
+	if Game.world == null:
+		return
+	var mil: Military = Game.world.get("military")
+	var sec: Security = Game.world.get("security")
+	var show_order := mil != null and mil.state == "active" and Game.playing and _modal == null
+	_order_panel.visible = show_order
+	if show_order:
+		var secs := maxi(0, int(ceil(float(mil.order["time"]))))
+		_order_title.text = "ORDER  %d:%02d" % [secs / 60, secs % 60]
+		_order_title.add_theme_color_override("font_color", Color(1, 0.4, 0.35) if secs <= 20 else Color(1, 0.95, 0.7))
+		var sig := str(mil.order["got"])
+		if sig != _order_sig:
+			_order_sig = sig
+			for c in _order_rows.get_children():
+				c.queue_free()
+			for t in mil.order["need"]:
+				var row := HBoxContainer.new()
+				row.add_theme_constant_override("separation", 6)
+				row.add_child(UiKit.tex(str(t), 30))
+				var got := int(mil.order["got"][t])
+				var need := int(mil.order["need"][t])
+				var done := got >= need
+				row.add_child(UiKit.label("%d / %d" % [mini(got, need), need], 20, Color(0.6, 1, 0.5) if done else Color(1, 1, 1), 6))
+				_order_rows.add_child(row)
+			_order_panel.offset_left = -16
+			_order_panel.reset_size()
+	var raid_text := ""
+	if sec != null and Game.playing:
+		if sec.raid_active:
+			raid_text = "CROW RAID!  %d left" % sec.alive_count()
+		elif sec.warn_t > 0.0:
+			raid_text = "Crow Clan raid in %d..." % int(ceil(sec.warn_t))
+	_raid_panel.visible = not raid_text.is_empty() and _modal == null
+	if _raid_panel.visible and _raid_label.text != raid_text:
+		_raid_label.text = raid_text
+		_raid_panel.offset_left = 0
+		_raid_panel.offset_right = 0
+		_raid_panel.reset_size()
+		var w := _raid_panel.get_combined_minimum_size().x
+		_raid_panel.offset_left = -w * 0.5
+		_raid_panel.offset_right = w * 0.5
+	_raid_panel.offset_top = 200 if _portrait else 88
+
+
+## Story dialog at the bottom of the screen. Tap to advance.
+func dialog(lines: Array, speaker: String, portrait: String, on_done: Callable) -> void:
+	if _dialog != null and is_instance_valid(_dialog):
+		_dialog.queue_free()
+	joy = Vector2.ZERO
+	_joy_active = false
+	var m := Control.new()
+	m.set_anchors_preset(Control.PRESET_FULL_RECT)
+	m.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(m)
+	_dialog = m
+	var dim := ColorRect.new()
+	dim.color = Color(0.05, 0.03, 0.1, 0.3)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	m.add_child(dim)
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	panel.offset_left = 24
+	panel.offset_right = -24
+	panel.offset_top = -210
+	panel.offset_bottom = -20
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_theme_stylebox_override("panel", UiKit.panel_style(Color(1, 0.98, 0.94), 28, 6, Color(0.42, 0.5, 0.3)))
+	m.add_child(panel)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 16)
+	panel.add_child(hb)
+	hb.add_child(UiKit.tex(portrait, 150))
+	var vb := VBoxContainer.new()
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(vb)
+	vb.add_child(UiKit.label(speaker, 28, Color(0.42, 0.5, 0.3), 0))
+	var text := UiKit.dark_label("", 24)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD
+	text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	text.custom_minimum_size = Vector2(300, 0)
+	vb.add_child(text)
+	var hint := UiKit.label("tap to continue", 16, Color(0.55, 0.5, 0.62), 0)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	vb.add_child(hint)
+	var state := {"i": 0}
+	var show_line := func() -> void:
+		text.text = str(lines[int(state["i"])])
+		text.visible_ratio = 0.0
+		var tw := text.create_tween()
+		tw.tween_property(text, "visible_ratio", 1.0, 0.02 * text.text.length())
+		Sfx.coo(-8.0)
+	show_line.call()
+	UiKit.pop(panel, 0.8)
+	var finish := func() -> void:
+		if is_instance_valid(m):
+			m.queue_free()
+		_dialog = null
+		on_done.call()
+	var on_input := func(ev: InputEvent) -> void:
+		if not (ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed):
+			return
+		if text.visible_ratio < 1.0:
+			text.visible_ratio = 1.0
+			return
+		state["i"] = int(state["i"]) + 1
+		Sfx.play("click", -6.0)
+		if int(state["i"]) >= lines.size():
+			finish.call()
+		else:
+			show_line.call()
+	m.gui_input.connect(on_input)
+	if Game.test_mode() and not bool(Game.dev["show_ui"]):
+		# autoplay: skip through the dialog
+		get_tree().create_timer(1.0, false).timeout.connect(finish)
+
+
+## The General's offer, with haggling.
+func military_offer(mil: Military) -> void:
+	if Game.test_mode() and not bool(Game.dev["show_ui"]):
+		mil.accept()
+		return
+	var vb := _open_modal("Offer", "MILITARY ORDER", 700)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 14)
+	vb.add_child(top)
+	top.add_child(UiKit.tex("portrait_general", 120))
+	var say := UiKit.dark_label("Baker! My troops need supplies. Here is what the army requires:", 22)
+	say.autowrap_mode = TextServer.AUTOWRAP_WORD
+	say.custom_minimum_size = Vector2(480, 0)
+	say.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(say)
+	var items := HBoxContainer.new()
+	items.alignment = BoxContainer.ALIGNMENT_CENTER
+	items.add_theme_constant_override("separation", 22)
+	vb.add_child(items)
+	for t in mil.order["need"]:
+		var col := VBoxContainer.new()
+		col.alignment = BoxContainer.ALIGNMENT_CENTER
+		col.add_child(UiKit.tex(str(t), 64))
+		var ql := UiKit.dark_label("x%d" % int(mil.order["need"][t]), 26)
+		ql.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(ql)
+		items.add_child(col)
+	var terms := HBoxContainer.new()
+	terms.alignment = BoxContainer.ALIGNMENT_CENTER
+	terms.add_theme_constant_override("separation", 30)
+	vb.add_child(terms)
+	var time_l := UiKit.label("", 26, UiKit.BLUE, 0)
+	var pay_l := UiKit.label("", 30, UiKit.GREEN, 0)
+	terms.add_child(time_l)
+	terms.add_child(pay_l)
+	var refresh := func() -> void:
+		var secs := int(float(mil.order["time"]))
+		time_l.text = "Time: %d:%02d" % [secs / 60, secs % 60]
+		pay_l.text = "Pay: $" + Game.fmt(int(mil.order["reward"]))
+	refresh.call()
+	var left := UiKit.label("", 16, Color(0.5, 0.46, 0.6), 0)
+	left.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(left)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
+	vb.add_child(row)
+	var acc := UiKit.button("Accept", UiKit.GREEN, Vector2(150, 62), 24)
+	var more_m := UiKit.button("More money", UiKit.ORANGE, Vector2(160, 62), 22)
+	var more_t := UiKit.button("More time", UiKit.BLUE, Vector2(150, 62), 22)
+	var dec := UiKit.button("Decline", UiKit.RED, Vector2(130, 62), 22)
+	row.add_child(acc)
+	row.add_child(more_m)
+	row.add_child(more_t)
+	row.add_child(dec)
+	var upd_left := func() -> void:
+		var n := Military.MAX_HAGGLES - mil.haggles
+		left.text = "Haggles left: %d  (he gets angrier every time you push)" % n
+		more_m.disabled = n <= 0
+		more_t.disabled = n <= 0
+	upd_left.call()
+	var do_haggle := func(kind: String) -> void:
+		var res: Dictionary = mil.haggle(kind)
+		say.text = str(res["line"])
+		Sfx.play("unlock" if bool(res["ok"]) else "nope", -5.0)
+		if bool(res["left"]):
+			close_modal()
+			toast("General Coo stormed off! No deal this time.", "ui_close")
+			return
+		refresh.call()
+		upd_left.call()
+	var on_money := func() -> void:
+		do_haggle.call("money")
+	var on_time := func() -> void:
+		do_haggle.call("time")
+	var on_accept := func() -> void:
+		mil.accept()
+		close_modal()
+	var on_decline := func() -> void:
+		mil.decline()
+		close_modal()
+	var on_closed := func() -> void:
+		# closing the window without choosing counts as declining
+		if mil.state == "offer":
+			mil.decline()
+	more_m.pressed.connect(on_money)
+	more_t.pressed.connect(on_time)
+	acc.pressed.connect(on_accept)
+	dec.pressed.connect(on_decline)
+	_modal.tree_exiting.connect(on_closed)

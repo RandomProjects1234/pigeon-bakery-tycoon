@@ -29,10 +29,14 @@ var flags := {}           # misc one-shot flags ("first_cash", "won", ...)
 var upg := {}
 var company := DEFAULT_COMPANY
 var tut := 0              # tutorial step (see world/objectives.gd)
-var stats := {"served": 0, "earned": 0, "baked": 0, "shooed": 0, "playtime": 0.0}
+var stats := {"served": 0, "earned": 0, "baked": 0, "shooed": 0, "playtime": 0.0,
+	"raids": 0, "crows_beaten": 0, "stolen": 0}
 var settings := {"music": true, "sfx": true, "shadows": true}
 var branch := 1           # "open a new branch" prestige count
 var station_state := {}   # station id -> saved piles etc.
+## Military contracts: finished/failed counts, reputation with the General,
+## and the order in progress (so a reload doesn't lose it).
+var military := {"done": 0, "failed": 0, "rep": 0, "order": {}}
 var player_pos := Vector2.INF
 var saved_at := 0
 var loaded_from_save := false
@@ -45,7 +49,7 @@ var playing := false      # false while the title menu is up
 var dev := {
 	"autoshot": [], "auto": false, "timescale": 1.0, "fresh": false, "money": -1,
 	"unlock": "", "bake_icons": false, "log": false, "play": false, "shotdir": "res://shots/",
-	"quit_after": -1.0, "cam": "", "pose": "", "menu": false, "allow_save": false,
+	"quit_after": -1.0, "cam": "", "pose": "", "menu": false, "allow_save": false, "raid_in": -1.0, "offer_in": -1.0, "show_ui": false,
 }
 
 var _save_timer := 0.0
@@ -259,7 +263,7 @@ func save_game() -> void:
 	var d := {
 		"v": 1, "money": money, "unlocked": unlocked.keys(), "paid": paid, "flags": flags.keys(),
 		"upg": upg, "company": company, "tut": tut, "stats": stats, "settings": settings,
-		"branch": branch, "stations": station_state, "saved_at": int(Time.get_unix_time_from_system()),
+		"branch": branch, "stations": station_state, "military": military, "saved_at": int(Time.get_unix_time_from_system()),
 	}
 	if player_pos != Vector2.INF:
 		d["player"] = [player_pos.x, player_pos.y]
@@ -302,6 +306,9 @@ func load_game() -> void:
 		settings[k] = bool(se[k])
 	branch = int(d.get("branch", 1))
 	station_state = d.get("stations", {})
+	var mil: Dictionary = d.get("military", {})
+	for k in mil:
+		military[k] = mil[k]
 	saved_at = int(d.get("saved_at", 0))
 	var pl: Array = d.get("player", [])
 	if pl.size() == 2:
@@ -322,6 +329,7 @@ func wipe_progress(keep_company := true, new_branch := false) -> void:
 		upg[k] = 0
 	tut = 0
 	station_state = {}
+	military = {"done": 0, "failed": 0, "rep": 0, "order": {}}
 	player_pos = Vector2.INF
 	settings = settings_keep
 	company = name_keep if keep_company else DEFAULT_COMPANY
@@ -332,7 +340,8 @@ func wipe_progress(keep_company := true, new_branch := false) -> void:
 		flags["first_cash"] = true
 	else:
 		branch = 1
-		stats = {"served": 0, "earned": 0, "baked": 0, "shooed": 0, "playtime": 0.0}
+		stats = {"served": 0, "earned": 0, "baked": 0, "shooed": 0, "playtime": 0.0,
+			"raids": 0, "crows_beaten": 0, "stolen": 0}
 	var was_playing := playing
 	playing = true
 	save_game()
@@ -376,6 +385,14 @@ func _parse_args() -> void:
 				dev["menu"] = true
 			"--allow-save":
 				dev["allow_save"] = true
+			"--show-ui":
+				dev["show_ui"] = true
+			"--raid-in":
+				dev["raid_in"] = float(nxt)
+				i += 1
+			"--offer-in":
+				dev["offer_in"] = float(nxt)
+				i += 1
 			"--quit-after":
 				dev["quit_after"] = float(nxt)
 				i += 1

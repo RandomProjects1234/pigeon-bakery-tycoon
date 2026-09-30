@@ -13,6 +13,12 @@ var leg_r: Node3D
 var phase := 0.0
 var carrying := false
 var _idle_t := 0.0
+var _swing := 0.0
+
+
+## Quick arm swipe (bonking a crow).
+func swing() -> void:
+	_swing = 0.3
 
 const SKIN := Color(1.0, 0.8, 0.64)
 
@@ -27,6 +33,10 @@ static func colors(r: String) -> Dictionary:
 			return {"shirt": Color(0.62, 0.42, 0.9), "pants": Color(0.25, 0.22, 0.35), "over": Color(0.62, 0.42, 0.9)}
 		"janitor":
 			return {"shirt": Color(0.4, 0.62, 0.66), "pants": Color(0.3, 0.42, 0.46), "over": Color(1.0, 0.82, 0.2)}
+		"guard":
+			return {"shirt": Color(0.18, 0.24, 0.42), "pants": Color(0.12, 0.14, 0.22), "over": Color(1.0, 0.82, 0.2)}
+		"runner":
+			return {"shirt": Color(0.4, 0.5, 0.28), "pants": Color(0.3, 0.36, 0.22), "over": Color(0.4, 0.5, 0.28)}
 	return {"shirt": Color(0.24, 0.56, 0.98), "pants": Color(0.2, 0.3, 0.6), "over": Color(0.98, 0.98, 0.98)}
 
 
@@ -108,6 +118,15 @@ static func _torso_mesh(r: String, c: Dictionary) -> ArrayMesh:
 		"janitor":
 			b.dome(0.25, Vector3(0, 1.08, 0), Color(1.0, 0.82, 0.2), Vector3(1.02, 0.6, 1.02))
 			b.box(Vector3(0.3, 0.03, 0.2), Vector3(0, 1.1, -0.3), Color(1.0, 0.82, 0.2))
+		"guard":   # police-style cap + badge + baton on the hip
+			b.cyl(0.25, 0.23, 0.14, Vector3(0, 1.2, 0), Color(0.15, 0.2, 0.36), Vector3.ZERO, 12)
+			b.box(Vector3(0.32, 0.03, 0.18), Vector3(0, 1.14, -0.28), Color(0.1, 0.1, 0.12))
+			b.box(Vector3(0.08, 0.08, 0.02), Vector3(0, 1.21, -0.25), Models.C_GOLD)
+			b.box(Vector3(0.08, 0.1, 0.02), Vector3(0.12, 0.5, -0.24), Models.C_GOLD)
+			b.cyl(0.035, 0.035, 0.45, Vector3(0.3, 0.1, 0.05), Color(0.1, 0.1, 0.12), Vector3(0, 0, 10), 6)
+		"runner":  # army helmet
+			b.dome(0.27, Vector3(0, 1.06, 0), Color(0.36, 0.45, 0.26), Vector3(1.05, 0.7, 1.08))
+			b.cyl(0.29, 0.29, 0.03, Vector3(0, 1.06, 0), Color(0.3, 0.38, 0.22), Vector3.ZERO, 12)
 	return b.build()
 
 
@@ -128,6 +147,14 @@ func animate(delta: float, speed: float) -> void:
 		hips.position.y = lerpf(hips.position.y, 0.55 + sin(_idle_t * 3.0) * 0.01, delta * 10.0)
 		torso.rotation.z = lerpf(torso.rotation.z, 0.0, delta * 8.0)
 		torso.rotation.x = lerpf(torso.rotation.x, 0.0, delta * 8.0)
+	if _swing > 0.0:
+		_swing -= delta
+		var k := sin((0.3 - _swing) / 0.3 * PI)
+		arm_r.rotation.x = 2.4 * k
+		arm_r.rotation.z = -0.6 * k
+		torso.rotation.y = -0.4 * k
+		return
+	torso.rotation.y = lerpf(torso.rotation.y, 0.0, delta * 10.0)
 	if carrying:
 		arm_l.rotation.x = lerpf(arm_l.rotation.x, 1.35, delta * 14.0)
 		arm_r.rotation.x = lerpf(arm_r.rotation.x, 1.35, delta * 14.0)

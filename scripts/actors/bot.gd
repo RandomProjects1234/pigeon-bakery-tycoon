@@ -91,7 +91,7 @@ func _task_done() -> bool:
 		"serve":
 			return world.register.queue.is_empty() or _hold > 6.0
 		"crow":
-			return world.crows.is_empty()
+			return world.crows.is_empty() and world.security.raiders.is_empty()
 		"table":
 			var tb := task["st"] as CafeTable
 			return tb.tips.value <= 0 and tb.dirty_count() == 0
@@ -104,6 +104,8 @@ func _task_done() -> bool:
 				return (st as Shelf).display.is_full()
 			if st is Machine:
 				return (st as Machine).input_room(t) <= 0
+			if st is Depot:
+				return not world.military.needs(t)
 			return false
 		"trash":
 			return pl.pile.is_empty()
@@ -122,6 +124,11 @@ func _decide() -> void:
 	task = {}
 	var pl := world.player
 	var reg := world.register
+	# 0. raiders
+	var raider := world.security.nearest(pl.global_position, 200.0)
+	if raider != null:
+		_assign("crow", raider.global_position)
+		return
 	# 1. crows
 	if not world.crows.is_empty():
 		var c: Node3D = world.crows[0]
@@ -233,6 +240,9 @@ func _unique(a: Array[String]) -> Array[String]:
 
 ## Where an item of type t should go: {"st":, "pos":} or {}.
 func _dest_for(t: String) -> Dictionary:
+	if world.military.needs(t) and world.stations.has("military_depot"):
+		var dep: Depot = world.stations["military_depot"]
+		return {"st": dep, "pos": dep.pad_pos("crate")}
 	if Items.PRODUCTS.has(t):
 		for s in world.shelves():
 			if s.product == t and not s.display.is_full():

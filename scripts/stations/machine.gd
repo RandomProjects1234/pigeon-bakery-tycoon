@@ -40,20 +40,27 @@ func build() -> void:
 	if inputs.size() == 1:
 		var p := _make_pile(Vector3(-0.62, 0.36, TRAY_Z), 2, 2, 12, inputs[0])
 		in_piles[inputs[0]] = p
-	else:
+	elif inputs.size() == 2:
 		for k in inputs.size():
 			var p := _make_pile(Vector3(-0.9 + k * 0.56, 0.36, TRAY_Z), 1, 2, 8, inputs[k])
+			in_piles[inputs[k]] = p
+	else:
+		# up to 4 ingredients: a 2x2 grid of little stacks on the input tray
+		for k in inputs.size():
+			var pos := Vector3(-0.86 + (k % 2) * 0.48, 0.36, TRAY_Z - 0.17 + (k / 2) * 0.34)
+			var p := _make_pile(pos, 1, 1, 6, inputs[k])
 			in_piles[inputs[k]] = p
 	out_pile = _make_pile(Vector3(0.62, 0.36, TRAY_Z), 2, 2, 16, output)
 	add_pad("in", Vector3(-PAD_X, 0, PAD_Z), 0.62, inputs[0])
 	add_pad("out", Vector3(PAD_X, 0, PAD_Z), 0.62, output, Color(0.75, 1.0, 0.7, 0.95))
-	if inputs.size() > 1:
-		# second input's icon next to the first on the same pad
+	# extra inputs get their icons around the first one on the same pad
+	var offs := [Vector3(0.3, 0, 0.3), Vector3(-0.3, 0, 0.3), Vector3(0.3, 0, -0.3)]
+	for k in range(1, inputs.size()):
 		var s := Sprite3D.new()
-		s.texture = Items.icon(inputs[1])
+		s.texture = Items.icon(inputs[k])
 		s.axis = Vector3.AXIS_Y
-		s.pixel_size = 0.35 / 128.0
-		s.position = Vector3(-PAD_X + 0.3, 0.05, PAD_Z + 0.3)
+		s.pixel_size = 0.32 / 128.0
+		s.position = Vector3(-PAD_X, 0.05, PAD_Z) + (offs[k - 1] as Vector3)
 		s.shaded = false
 		add_child(s)
 	add_collider(Vector3(2.4, 1.3, 2.75), Vector3(0, 0, 0.25))
@@ -322,6 +329,24 @@ func _build_model(model: String) -> void:
 			add_child(bub)
 			_anim["bubbles"] = bub
 			_anim["smoke"] = _smoke(Vector3(0, 1.5, -0.3), Color(1, 1, 1))
+		"pie_oven":
+			MeshBuilder.node(Models.cached(key, func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				var plum := Color(0.55, 0.3, 0.55)
+				b.box(Vector3(2.3, 1.3, 1.9), Vector3(0, 0.65, -0.2), plum)
+				b.box(Vector3(2.4, 0.14, 2.0), Vector3(0, 1.35, -0.2), Models.C_GOLD)
+				b.box(Vector3(1.2, 0.62, 0.06), Vector3(0, 0.62, 0.72), Models.C_GOLD)
+				b.cyl(0.62, 0.62, 0.06, Vector3(0, 0.93, 0.72), Models.C_GOLD, Vector3(90, 0, 0), 14)
+				for x in [-0.75, 0.75]:
+					b.cyl(0.14, 0.16, 0.9, Vector3(x, 1.85, -0.7), plum.darkened(0.25), Vector3.ZERO, 8)
+					b.cyl(0.2, 0.2, 0.08, Vector3(x, 2.32, -0.7), Models.C_GOLD, Vector3.ZERO, 8)
+				b.box(Vector3(2.0, 0.1, 0.05), Vector3(0, 0.12, 0.72), Models.C_GOLD)
+				return b.build()), self)
+			var orn := MeshBuilder.node(Models.item_mesh("pie"), self)
+			orn.position = Vector3(0, 1.42, -0.2)
+			orn.scale = Vector3.ONE * 2.6
+			_glow(Vector3(1.0, 0.5, 0.04), Vector3(0, 0.6, 0.74))
+			_anim["smoke"] = _smoke(Vector3(-0.75, 2.45, -0.7), Color(1.0, 0.92, 0.95))
 		"pizza_oven":
 			MeshBuilder.node(Models.cached(key, func() -> ArrayMesh:
 				var b := MeshBuilder.new()

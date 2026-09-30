@@ -122,9 +122,14 @@ func _apply_dev_unlocks() -> void:
 		return
 	Game.tut = 99
 	Game.flags["first_cash"] = true
-	if u == "all":
+	if u == "all" or u == "endgame":
+		# "endgame" = everything up to the statue, with General Coo already met
 		for z in Layout.ZONES:
 			Game.unlocked[str(z["id"])] = true
+			if u == "endgame" and str(z["id"]) == "statue":
+				break
+		Game.flags["won"] = true
+		Game.flags["general_met"] = true
 		return
 	if u.begins_with("upto:"):
 		var stop := u.substr(5)

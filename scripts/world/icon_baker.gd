@@ -5,7 +5,7 @@ extends Node
 ## tools/outline_icons.py then adds the sticker outline.
 
 const ITEMS: Array[String] = ["wheat", "sunflower", "flour", "tomato", "potato", "bread", "seeds",
-	"croissant", "pizza", "fries", "cash"]
+	"croissant", "pizza", "fries", "cash", "pie"]
 
 
 func _ready() -> void:
@@ -55,5 +55,23 @@ func _bake() -> void:
 		img.save_png(path)
 		print("[bake] ", path)
 		n.queue_free()
+		await get_tree().process_frame
+	# character portraits for dialogs and the raid banner
+	for v in ["general", "crow_boss"]:
+		var rig := PigeonRig.new(v)
+		vp.add_child(rig)
+		rig.rotation.y = PI - 0.3
+		var c2 := Vector3(-0.07, 0.8, 0.2)
+		cam.size = 0.8
+		cam.position = c2 + Vector3(0.1, 0.18, 1.0).normalized() * 4.0
+		cam.look_at(c2, Vector3.UP)
+		for i in 3:
+			await RenderingServer.frame_post_draw
+		var img2 := vp.get_texture().get_image()
+		img2.resize(128, 128, Image.INTERPOLATE_LANCZOS)
+		var name2 := "portrait_general" if v == "general" else "portrait_crow"
+		img2.save_png(ProjectSettings.globalize_path("res://assets/icons/%s.png" % name2))
+		print("[bake] ", name2)
+		rig.queue_free()
 		await get_tree().process_frame
 	get_tree().quit()

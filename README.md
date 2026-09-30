@@ -4,6 +4,8 @@ A mobile-style "arcade idle" tycoon (like the playable ads) built in Godot 4.4. 
 
 ![Title screen](docs/title.png)
 ![Gameplay](docs/gameplay.png)
+![Military order](docs/military.png)
+![Crow raid](docs/raid.png)
 
 **Play in your browser (phones too):** https://randomprojects1234.github.io/pigeon-bakery-tycoon/
 
@@ -36,12 +38,21 @@ Name your company on the title screen (the `?` button picks a random name). You 
 
 Along the way you unlock:
 
-- **Products**: Bread ($5), Birdseed ($9), Croissants ($16), Pizza ($30), Fries ($24).
+- **Products**: Bread ($5), Birdseed ($9), Croissants ($16), Pizza ($30), Fries ($24), and the **All-Ingredient Pie** ($500). The pie needs flour, tomatoes, potatoes and sunflower seeds. It is the most expensive item, so only the odd rich pigeon buys one.
 - **Supply chain**: wheat, sunflower, tomato and potato fields; the flour mill; the pizza oven, which needs flour **and** tomatoes.
 - **Staff**: cashier, farmers, bakers and a janitor. Each works one station.
 - **Cafe tables**: pigeons eat there, tip, and leave crumbs to clean.
 - **Manager's Office**: upgrades for speed, carry size, prices, machine speed and staff.
 - **The Back Lot**: more fields, the Pigeon Fountain, the VIP Golden Perch (VIP pigeons pay 3x) and the **Founder's Statue**. The statue is the finale; after it you can open a new branch with +50% prices.
+
+## Military + Security update (after the Founder's Statue)
+
+- **General Coo** of the Pigeon Army flies in: the Crow Clans are at war with the city's pigeons, and his soldiers need feeding.
+- **The outpost:** buy the **Military Outpost** (new land east of the yard) and build the **Supply Depot**. The army truck, the General and his soldiers wait there.
+- **Orders:** military orders arrive at random: a list of products, a deadline and a reward. Before accepting you can **bargain** for more money or more time. Every push makes the General angrier, and two bad pushes and he storms off. The army never orders pie.
+- **Delivering:** drop the products on the depot's supply crate. Finish in time to get paid and climb the ranks, from Recruit Supplier to The General's Baker. Fail and your reputation drops. **Supply Runners** can be hired to haul orders for you.
+- **Crow Clan raids:** after a siren, a raid flies in from one side (with a bandana-wearing **Crow Boss** every third raid). They steal from shelves, machine trays, the cash pile and your **wallet** (the office safe).
+- **Defending:** walk into crows to bonk them. A knocked-out crow drops everything it stole, and you get a bounty. Build a **Security Booth**, hire **Guards** who chase crows, and place **Seed Slingshot** turrets around the base.
 
 Events:
 
@@ -98,6 +109,9 @@ godot --headless --path . --export-release "Web" build/web/index.html
 | `--menu` | keep the title menu in test runs |
 | `--pose pigeon` | close-up line-up of the pigeon variants |
 | `--allow-save` | let test runs read and write the save |
+| `--unlock endgame` | everything up to the statue, General Coo already met |
+| `--raid-in N` / `--offer-in N` | first crow raid / military order after N seconds |
+| `--show-ui` | show dialogs and offers in test runs (instead of auto-accepting) |
 
 Full headless balance run:
 

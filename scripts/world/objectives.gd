@@ -24,6 +24,31 @@ func update() -> void:
 	_advance_tutorial(st, player)
 	target = Vector3.INF
 	step_label = ""
+	# raids and military orders come first once they exist
+	var sec: Security = world.get("security")
+	var mil: Military = world.get("military")
+	if sec != null and sec.raid_active and sec.alive_count() > 0:
+		text = "Fight off the crows! (%d left)" % sec.alive_count()
+		icon = "portrait_crow"
+		var r := sec.nearest(player.global_position, 200.0)
+		if r != null:
+			target = r.global_position + Vector3(0, 0.6, 0)
+		return
+	if Game.has_flag("won") and not Game.has_flag("general_met"):
+		text = "Someone important is coming..."
+		icon = "military"
+		return
+	if mil != null and mil.state == "active":
+		var carrying := false
+		for t in mil.needed_types():
+			if player.pile.has_type(t):
+				carrying = true
+		var dep: Node = st.get("military_depot", null)
+		if carrying and dep != null:
+			text = "Deliver the order to the Supply Depot"
+			icon = "military"
+			target = (dep as Depot).pad_pos("crate")
+			return
 	# a crow always takes priority once the tutorial is over
 	if Game.tut >= TUT_STEPS and not crows.is_empty():
 		var c: Node3D = crows[0]
@@ -81,6 +106,10 @@ func update() -> void:
 			best_rem = rem
 			best = z.def
 	if best.is_empty():
+		if st.has("military_depot") and mil != null and mil.state == "idle":
+			text = "Keep the base safe. The next military order is coming..."
+			icon = "military"
+			return
 		if Game.has_flag("won"):
 			text = "Your pigeon empire is complete!"
 		else:

@@ -31,7 +31,15 @@ const BACKLOT_RECT := Rect2(-18.0, 7.5, 36.0, 13.5)
 
 const PLAYER_SPAWN := Vector2(-11.6, -1.0)
 const REGISTER_POS := Vector2(-13.5, -10.6)
+const TRASH_POS := Vector2(11.4, -10.8)
 const OFFICE_DOOR := Vector2(15.5, -2.0)
+const OUTPOST_RECT := Rect2(18.4, -8.2, 12.8, 15.7)
+
+## Fence gaps that open when a land zone is bought.
+const GATES := {
+	"backlot": [Vector2(-1.3, 7.5), Vector2(1.3, 7.5)],
+	"military_base": [Vector2(18.4, -1.8), Vector2(18.4, 0.8)],
+}
 
 const ZONES: Array[Dictionary] = [
 	# ---------------------------------------------------------- tutorial --
@@ -67,13 +75,13 @@ const ZONES: Array[Dictionary] = [
 	{"id": "hire_baker_bread", "kind": "hire", "name": "Hire Baker", "cost": 210,
 		"pos": Vector2(X_BREAD + 1.9, MACHINE_Z), "req": ["hire_farmer_w1"], "role": "baker", "station": "oven_bread"},
 	{"id": "field_sun2", "kind": "field", "name": "Sunflower Patch", "cost": 260,
-		"pos": Vector2(X_CROIS, FIELD_Z), "req": ["hire_baker_bread"], "crop": "sunflower", "feeds": ["packer_seed"]},
+		"pos": Vector2(X_CROIS, FIELD_Z), "req": ["hire_baker_bread"], "crop": "sunflower", "feeds": ["packer_seed", "oven_pie"]},
 	{"id": "table_4", "kind": "table", "name": "Cafe Table", "cost": 240,
 		"pos": Vector2(-24.3, -15.5), "req": ["table_3", "hire_baker_bread"]},
 	# --------------------------------------------------------- croissant --
 	{"id": "mill", "kind": "machine", "name": "Flour Mill", "cost": 450,
 		"pos": Vector2(X_MILL, MACHINE_Z), "req": ["hire_baker_bread"], "model": "mill",
-		"inputs": ["wheat"], "output": "flour", "time": 1.3, "to": ["oven_croissant", "oven_pizza"]},
+		"inputs": ["wheat"], "output": "flour", "time": 1.3, "to": ["oven_croissant", "oven_pizza", "oven_pie"]},
 	{"id": "field_wheat3", "kind": "field", "name": "Wheat Field", "cost": 300,
 		"pos": Vector2(X_MILL, FIELD_Z), "req": ["mill"], "crop": "wheat", "feeds": ["mill"]},
 	{"id": "oven_croissant", "kind": "machine", "name": "Croissant Oven", "cost": 600,
@@ -129,9 +137,9 @@ const ZONES: Array[Dictionary] = [
 	{"id": "fountain", "kind": "decor", "name": "Pigeon Fountain", "cost": 5000,
 		"pos": Vector2(-8.0, 17.5), "req": ["backlot"], "model": "fountain", "popularity": 0.3},
 	{"id": "field_tomato2", "kind": "field", "name": "Tomato Patch", "cost": 4000,
-		"pos": Vector2(X_PIZZA, BACK_FIELD_Z), "req": ["backlot"], "crop": "tomato", "feeds": ["oven_pizza"]},
+		"pos": Vector2(X_PIZZA, BACK_FIELD_Z), "req": ["backlot"], "crop": "tomato", "feeds": ["oven_pizza", "oven_pie"]},
 	{"id": "field_potato2", "kind": "field", "name": "Potato Patch", "cost": 5000,
-		"pos": Vector2(X_FRIES, BACK_FIELD_Z), "req": ["backlot"], "crop": "potato", "feeds": ["fryer"]},
+		"pos": Vector2(X_FRIES, BACK_FIELD_Z), "req": ["backlot"], "crop": "potato", "feeds": ["fryer", "oven_pie"]},
 	{"id": "field_wheat4", "kind": "field", "name": "Wheat Field", "cost": 3000,
 		"pos": Vector2(X_MILL, BACK_FIELD_Z), "req": ["backlot"], "crop": "wheat", "feeds": ["mill", "oven_bread"]},
 	{"id": "hire_farmer_t2", "kind": "hire", "name": "Hire Farmer", "cost": 5000,
@@ -140,10 +148,46 @@ const ZONES: Array[Dictionary] = [
 		"pos": Vector2(X_FRIES, 14.8), "req": ["field_potato2"], "role": "farmer", "station": "field_potato2"},
 	{"id": "hire_farmer_w4", "kind": "hire", "name": "Hire Farmer", "cost": 4000,
 		"pos": Vector2(X_MILL, 14.8), "req": ["field_wheat4"], "role": "farmer", "station": "field_wheat4"},
-	{"id": "golden_perch", "kind": "decor", "name": "VIP Golden Perch", "cost": 12000,
+	{"id": "golden_perch", "kind": "decor", "name": "VIP Golden Perch", "cost": 10000,
 		"pos": Vector2(-14.0, 17.0), "req": ["fountain"], "model": "perch", "popularity": 0.2},
-	{"id": "statue", "kind": "statue", "name": "Founder's Statue", "cost": 30000,
+	# ------------------------------------------------ all-ingredient pie --
+	{"id": "oven_pie", "kind": "machine", "name": "Pie Oven", "cost": 15000,
+		"pos": Vector2(X_W2, MACHINE_Z), "req": ["field_tomato2", "field_potato2"], "model": "pie_oven",
+		"inputs": ["flour", "tomato", "potato", "sunflower"], "output": "pie", "time": 4.0, "to": ["shelf_pie"]},
+	{"id": "shelf_pie", "kind": "shelf", "name": "Pie Shelf", "cost": 10000,
+		"pos": Vector2(X_MILL, SHELF_Z), "req": ["oven_pie"], "product": "pie"},
+	{"id": "hire_baker_pie", "kind": "hire", "name": "Hire Pie Chef", "cost": 12000,
+		"pos": Vector2(X_W2 - 2.3, MACHINE_Z - 1.6), "req": ["shelf_pie"], "role": "baker", "station": "oven_pie"},
+	{"id": "statue", "kind": "statue", "name": "Founder's Statue", "cost": 25000,
 		"pos": Vector2(-1.9, 17.5), "req": ["golden_perch", "hire_farmer_p2", "hire_farmer_t2"], "popularity": 0.5},
+	# ------------------------------------------- military + security ----
+	# unlocked after the Founder's Statue, once General Coo has visited
+	{"id": "military_base", "kind": "land", "name": "Military Outpost", "cost": 8000,
+		"pos": Vector2(18.4, -0.5), "req": ["flag:general_met"]},
+	{"id": "military_depot", "kind": "depot", "name": "Supply Depot", "cost": 10000,
+		"pos": Vector2(24.5, -3.0), "req": ["military_base"]},
+	{"id": "security_hq", "kind": "security", "name": "Security Booth", "cost": 6000,
+		"pos": Vector2(-12.5, 10.2), "req": ["flag:general_met"]},
+	{"id": "hire_guard_1", "kind": "hire", "name": "Hire Guard", "cost": 5000,
+		"pos": Vector2(-16.0, 13.6), "req": ["security_hq"], "role": "guard", "station": "security_hq"},
+	{"id": "turret_1", "kind": "turret", "name": "Seed Slingshot", "cost": 4000,
+		"pos": Vector2(-15.6, -18.0), "req": ["security_hq"]},
+	{"id": "turret_2", "kind": "turret", "name": "Seed Slingshot", "cost": 5500,
+		"pos": Vector2(15.6, 3.5), "req": ["turret_1"]},
+	{"id": "hire_runner_1", "kind": "hire", "name": "Hire Supply Runner", "cost": 8000,
+		"pos": Vector2(21.0, 4.8), "req": ["military_depot"], "role": "runner", "station": "military_depot"},
+	{"id": "hire_guard_2", "kind": "hire", "name": "Hire Guard", "cost": 9000,
+		"pos": Vector2(-12.5, 13.6), "req": ["hire_guard_1"], "role": "guard", "station": "security_hq"},
+	{"id": "turret_3", "kind": "turret", "name": "Seed Slingshot", "cost": 7000,
+		"pos": Vector2(-26.4, -17.5), "req": ["turret_2"]},
+	{"id": "hire_runner_2", "kind": "hire", "name": "Hire Supply Runner", "cost": 14000,
+		"pos": Vector2(24.5, 4.8), "req": ["hire_runner_1"], "role": "runner", "station": "military_depot"},
+	{"id": "turret_4", "kind": "turret", "name": "Seed Slingshot", "cost": 8500,
+		"pos": Vector2(12.5, 18.5), "req": ["turret_3"]},
+	{"id": "turret_5", "kind": "turret", "name": "Seed Slingshot", "cost": 10000,
+		"pos": Vector2(29.5, 6.0), "req": ["turret_4", "military_depot"]},
+	{"id": "hire_guard_3", "kind": "hire", "name": "Hire Guard", "cost": 15000,
+		"pos": Vector2(-9.0, 13.6), "req": ["hire_guard_2"], "role": "guard", "station": "security_hq"},
 ]
 
 
@@ -176,6 +220,12 @@ static func zone_icon(z: Dictionary) -> String:
 			return "hire_" + str(z["role"])
 		"land":
 			return "land"
+		"depot":
+			return "military"
+		"security":
+			return "security"
+		"turret":
+			return "turret"
 		"decor":
 			return "fountain" if str(z.get("model", "")) == "fountain" else "perch"
 		"statue":

@@ -193,6 +193,31 @@ def sfx():
     write("thud", mix(boom, lowpass(noise(0.35), 400) * np.exp(-t / 0.05) * 0.6), 0.75)
     # trash
     write("trash", lowpass(noise(0.25), 1500) * env_exp(0.25, 0.08), 0.5)
+    # air-raid siren (rising/falling wail)
+    t = t_arr(2.4)
+    f = 500 + 320 * np.sin(2 * np.pi * 0.8 * t - np.pi / 2)
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    sir = (np.sin(ph) + 0.4 * np.sin(2 * ph)) * np.clip(t / 0.2, 0, 1) * np.clip((2.4 - t) / 0.3, 0, 1)
+    write("siren", lowpass(sir, 2500), 0.55)
+    # bonk (hitting a crow)
+    t = t_arr(0.18)
+    bk = np.sin(2 * np.pi * np.cumsum(420 - 250 * t / 0.18) / SR) * np.exp(-t / 0.05)
+    write("bonk", mix(bk, highpass(noise(0.18), 1500) * np.exp(-t / 0.015) * 0.6), 0.7)
+    # truck horn
+    t = t_arr(0.7)
+    hn = sum(np.sign(np.sin(2 * np.pi * f0 * t)) for f0 in (233, 294)) * np.clip(t / 0.02, 0, 1) * np.clip((0.7 - t) / 0.08, 0, 1)
+    write("horn", lowpass(hn, 1800), 0.45)
+    # bugle call
+    bug = np.zeros(int(1.3 * SR))
+    for n, o, d in [("G4", 0.0, 0.14), ("C5", 0.16, 0.14), ("E5", 0.32, 0.14), ("G5", 0.48, 0.5), ("E5", 1.0, 0.25)]:
+        t = t_arr(d)
+        fq = note_freq(n)
+        tone = np.sin(2 * np.pi * fq * t) + 0.5 * np.sin(4 * np.pi * fq * t) + 0.3 * np.sin(6 * np.pi * fq * t)
+        bug += at(lowpass(tone, 3000) * np.clip(t / 0.02, 0, 1) * np.clip((d - t) / 0.04, 0, 1), o, 1.3)
+    write("bugle", bug, 0.5)
+    # slingshot twang
+    t = t_arr(0.2)
+    write("twang", sweep(900, 300, 0.2) * np.exp(-t / 0.06), 0.4)
     # eating nom
     nom = np.zeros(int(0.4 * SR))
     for i in range(3):

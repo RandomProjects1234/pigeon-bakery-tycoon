@@ -20,6 +20,12 @@ var _wait := 0.0
 var _speed_now := 0.0
 var _think := 0.0
 var _clean_table: CafeTable = null
+var _source: Machine = null      # runner: where it's picking up
+var _hit_cd := 0.0
+var _patrol_i := 0
+
+const PATROL := [Vector3(-8, 0, -11), Vector3(-20, 0, -14), Vector3(-6, 0, -1), Vector3(8, 0, -1),
+	Vector3(3, 0, -18), Vector3(0, 0, 13), Vector3(24, 0, 2)]
 
 
 func setup(w: Node, r: String, st_id: String, spawn_at: Vector3) -> void:
@@ -35,7 +41,7 @@ func setup(w: Node, r: String, st_id: String, spawn_at: Vector3) -> void:
 	home = (world.get("stations") as Dictionary).get(station_id, null)
 	if role == "cashier":
 		home = world.get("register")
-	job = J.GO_PICK if role in ["farmer", "baker"] else J.POST
+	job = J.GO_PICK if role in ["farmer", "baker", "runner"] else J.POST
 
 
 func capacity() -> int:
@@ -47,6 +53,8 @@ func interval() -> float:
 
 
 func wants_pick(st: Node, _pad: String, _t: String) -> bool:
+	if role == "runner":
+		return st == _source and job == J.PICK and pile.room() > 0
 	return st == home and job == J.PICK and pile.room() > 0
 
 
@@ -103,6 +111,8 @@ func _physics_process(delta: float) -> void:
 		home = (world.get("stations") as Dictionary).get(station_id, null)
 		if role == "cashier":
 			home = world.get("register")
+	if home == null and role in ["guard", "runner"]:
+		home = self
 	match role:
 		"farmer":
 			_farmer(delta)
@@ -112,6 +122,10 @@ func _physics_process(delta: float) -> void:
 			_cashier(delta)
 		"janitor":
 			_janitor(delta)
+		"guard":
+			_guard(delta)
+		"runner":
+			_runner(delta)
 	pile.capacity = capacity()
 	rig.carrying = pile.count() > 0
 	rig.animate(delta, _speed_now)
@@ -303,6 +317,143 @@ func _janitor(delta: float) -> void:
 	_go(_clean_table.global_position + Vector3(0, 0, 1.3))
 	if _walk(delta):
 		_face_dir(Vector3(0, 0, -1), delta)
+
+
+# -------------------------------------------------------------- guard ----
+func _guard(delta: float) -> void:
+	_hit_cd -= delta
+	var sec: Security = world.get("security")
+	var target: Raider = sec.nearest(global_position, 40.0) if sec != null else null
+	if target != null:
+		var to := Vector3(target.global_position.x - global_position.x, 0, target.global_position.z - global_position.z)
+		var d := to.length()
+		if d > 1.1:
+			var spd := Game.staff_speed() * 1.25
+			if d > 6.0:
+				_go(target.global_position)
+				_walk(delta)
+				_speed_now = spd
+			else:
+				var dir := to / d
+				global_position += dir * minf(spd * delta, d)
+				velocity = dir * spd
+				_speed_now = spd
+				rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), clampf(delta * 12.0, 0.0, 1.0))
+		else:
+			_speed_now = 0.0
+			if _hit_cd <= 0.0:
+				_hit_cd = 0.5
+				target.hit(1, global_position)
+				rig.swing()
+		return
+	# patrol the base
+	var p: Vector3 = PATROL[_patrol_i % PATROL.size()]
+	if not Game.is_unlocked("military_base") and p.x > 18.0:
+		_patrol_i += 1
+		return
+	_go(p)
+	if _walk(delta):
+		_patrol_i = (_patrol_i + randi_range(1, 3)) % PATROL.size()
+
+
+# ------------------------------------------------------------- runner ----
+func _runner(delta: float) -> void:
+	var mil: Military = world.get("military")
+	var dep: Node = (world.get("stations") as Dictionary).get("military_depot", null)
+	if mil == null or dep == null:
+		return
+	match job:
+		J.GO_PICK:
+			_source = _pick_source(mil)
+			if _source == null:
+				# nothing to fetch: hand leftovers to shelves, else wait by the depot
+				if pile.count() > 0:
+					_runner_leftovers()
+					return
+				_go((dep as Node3D).global_position + Vector3(-2.6, 0, 3.4))
+				_walk(delta)
+				return
+			job = J.PICK
+			_goal = Vector3.INF
+			_wait = 0.0
+		J.PICK:
+			if _source == null or not is_instance_valid(_source):
+				job = J.GO_PICK
+				return
+			_go(_source.pad_pos("out"))
+			if not _walk(delta):
+				return
+			_face_dir(Vector3(0, 0, -1), delta)
+			carry_type = _source.output
+			var still := mil.remaining(carry_type) - pile.count_of(carry_type)
+			if pile.room() <= 0 or still <= 0:
+				_to_depot(dep)
+			elif _source.out_pile.count() == 0:
+				_wait += delta
+				if _wait > 1.5:
+					if pile.count() > 0:
+						_to_depot(dep)
+					else:
+						job = J.GO_PICK
+		J.GO_DROP:
+			if drop_target == null or not is_instance_valid(drop_target):
+				job = J.GO_PICK
+				return
+			_go(drop_target.pad_pos(drop_pad))
+			if _walk(delta):
+				job = J.DROP
+				_wait = 0.0
+		J.DROP:
+			_face_dir(Vector3(0, 0, -1), delta)
+			var needed := false
+			for t in pile.types:
+				if drop_target is Depot and mil.needs(t):
+					needed = true
+				elif drop_target is Shelf and t == (drop_target as Shelf).product and not (drop_target as Shelf).display.is_full():
+					needed = true
+			if not needed:
+				job = J.GO_PICK
+				_goal = Vector3.INF
+
+
+func _pick_source(mil: Military) -> Machine:
+	var best: Machine = null
+	var best_n := 0
+	for t in mil.needed_types():
+		var want := mil.remaining(t) - pile.count_of(t)
+		if want <= 0:
+			continue
+		for s in world.get("station_list"):
+			var m := s as Machine
+			if m != null and m.output == t and m.out_pile.count() > best_n:
+				best_n = m.out_pile.count()
+				best = m
+	return best
+
+
+func _to_depot(dep: Node) -> void:
+	drop_target = dep as Station
+	drop_pad = "crate"
+	job = J.GO_DROP
+	_goal = Vector3.INF
+
+
+func _runner_leftovers() -> void:
+	var t := pile.top_type()
+	for s in world.call("shelves"):
+		var sh := s as Shelf
+		if sh.product == t and not sh.display.is_full():
+			drop_target = sh
+			drop_pad = "stock"
+			job = J.GO_DROP
+			_goal = Vector3.INF
+			return
+	# nowhere to put it: bin it
+	var trash: Station = (world.get("stations") as Dictionary).get("trash", null)
+	if trash != null:
+		while pile.count() > 0:
+			var n := pile.take()
+			ItemPile.fly_away(n, trash.global_position + Vector3(0, 1, 0), 0.4, 1.0)
 
 
 func _idle_spot(delta: float) -> void:

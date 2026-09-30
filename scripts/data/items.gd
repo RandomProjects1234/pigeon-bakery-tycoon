@@ -14,11 +14,12 @@ const DEF := {
 	"croissant": {"name": "Croissant", "price": 16, "h": 0.16},
 	"pizza": {"name": "Pizza", "price": 30, "h": 0.1},
 	"fries": {"name": "Fries", "price": 24, "h": 0.3},
+	"pie": {"name": "All-Ingredient Pie", "price": 500, "h": 0.15},
 	"cash": {"name": "Cash", "price": 0, "h": 0.065},
 }
 
 ## Products in the order they unlock.
-const PRODUCTS: Array[String] = ["bread", "seeds", "croissant", "pizza", "fries"]
+const PRODUCTS: Array[String] = ["bread", "seeds", "croissant", "pizza", "fries", "pie"]
 
 static var _icons := {}
 

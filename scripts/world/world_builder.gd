@@ -9,7 +9,7 @@ static func build(w: Node3D, nav: NavGrid) -> Dictionary:
 	_ground(w)
 	_shop(w, nav)
 	_terrace(w, nav)
-	out["gate"] = _fences(w, nav)
+	out["gates"] = _fences(w, nav)
 	_outskirts(w)
 	return out
 
@@ -208,7 +208,7 @@ static func _shop(w: Node3D, nav: NavGrid) -> void:
 	fit_sign(title, Game.company)
 	w.set("company_label", title)
 	# planters in the corners
-	for p in [Vector3(x0 + 0.7, 0, zb + 0.7), Vector3(x1 - 0.7, 0, zb + 0.7), Vector3(x1 - 0.7, 0, -8.7)]:
+	for p in [Vector3(x0 + 0.7, 0, zb + 0.7), Vector3(x1 - 0.7, 0, zb + 0.7)]:
 		var pl := MeshBuilder.node(Models.planter_mesh(), w)
 		pl.position = p
 		nav.set_rect(Vector2(p.x, p.z), Vector2(0.6, 0.6), true, 0.2)
@@ -230,14 +230,15 @@ static func _terrace(w: Node3D, nav: NavGrid) -> void:
 	nav.set_rect(Vector2(-22.3, -21.4), Vector2(1.6, 0.5), true, 0.2)
 
 
-static func _fences(w: Node3D, nav: NavGrid) -> Node3D:
+static func _fences(w: Node3D, nav: NavGrid) -> Dictionary:
 	# terrace
 	add_fence(w, nav, Vector2(-27.4, -22.4), Vector2(-27.4, -7.3))
 	add_fence(w, nav, Vector2(-27.4, -22.4), Vector2(-16.9, -22.4))
 	add_fence(w, nav, Vector2(-27.4, -7.3), Vector2(-18.4, -7.3))
-	# yard
+	# yard (the east side has the gate to the military outpost)
 	add_fence(w, nav, Vector2(-18.4, -7.3), Vector2(-18.4, 7.5))
-	add_fence(w, nav, Vector2(18.4, -8.2), Vector2(18.4, 7.5))
+	add_fence(w, nav, Vector2(18.4, -8.2), Vector2(18.4, -1.8))
+	add_fence(w, nav, Vector2(18.4, 0.8), Vector2(18.4, 7.5))
 	add_fence(w, nav, Vector2(12.9, -8.2), Vector2(18.4, -8.2))
 	add_fence(w, nav, Vector2(-18.4, 7.5), Vector2(-1.3, 7.5))
 	add_fence(w, nav, Vector2(1.3, 7.5), Vector2(18.4, 7.5))
@@ -245,15 +246,24 @@ static func _fences(w: Node3D, nav: NavGrid) -> Node3D:
 	add_fence(w, nav, Vector2(-18.4, 7.5), Vector2(-18.4, 21.3))
 	add_fence(w, nav, Vector2(18.4, 7.5), Vector2(18.4, 21.3))
 	add_fence(w, nav, Vector2(-18.4, 21.3), Vector2(18.4, 21.3))
-	var gate: Node3D = null
-	if not Game.is_unlocked("backlot"):
-		gate = add_fence(w, nav, Vector2(-1.3, 7.5), Vector2(1.3, 7.5))
+	# military outpost east of the yard
+	var o := Layout.OUTPOST_RECT
+	add_fence(w, nav, Vector2(o.position.x, o.position.y), Vector2(o.end.x, o.position.y))
+	add_fence(w, nav, Vector2(o.end.x, o.position.y), Vector2(o.end.x, o.end.y))
+	add_fence(w, nav, Vector2(o.position.x, o.end.y), Vector2(o.end.x, o.end.y))
+	_slab(w, Rect2(o.position.x, o.position.y, o.size.x, o.size.y), 0.007, Color(0.78, 0.72, 0.52), "outpost_ground")
+	var gates := {}
+	for id in Layout.GATES:
+		if Game.is_unlocked(str(id)):
+			continue
+		var g: Array = Layout.GATES[id]
+		gates[id] = add_fence(w, nav, g[0], g[1])
 	# lamps in the yard corners
 	for p in [Vector3(-17.7, 0, -6.9), Vector3(17.7, 0, 6.8), Vector3(-17.7, 0, 6.8), Vector3(17.7, 0, -7.6)]:
 		var l := MeshBuilder.node(Models.lamp_mesh(), w)
 		l.position = p
 		l.rotation.y = PI if p.x > 0 else 0.0
-	return gate
+	return gates
 
 
 static func _outskirts(w: Node3D) -> void:
@@ -265,7 +275,8 @@ static func _outskirts(w: Node3D) -> void:
 	for i in 90:
 		var p := Vector3(rng.randf_range(-60, 60), 0, rng.randf_range(-24, 60))
 		var inside_map := p.x > -29.5 and p.x < 20.5 and p.z > -24.0 and p.z < 23.5
-		if inside_map:
+		var in_outpost := p.x > 17.0 and p.x < 33.5 and p.z > -10.5 and p.z < 9.5
+		if inside_map or in_outpost:
 			continue
 		var t := MeshBuilder.node(Models.tree_mesh(rng.randi() % 3), tree_root)
 		t.position = p
@@ -274,7 +285,8 @@ static func _outskirts(w: Node3D) -> void:
 	for i in 30:
 		var p := Vector3(rng.randf_range(-40, 40), 0, rng.randf_range(-23.5, 40))
 		var inside_map := p.x > -28.2 and p.x < 19.2 and p.z > -23.2 and p.z < 22.2
-		if inside_map:
+		var in_outpost := p.x > 17.5 and p.x < 32.5 and p.z > -9.5 and p.z < 8.5
+		if inside_map or in_outpost:
 			continue
 		var bsh := MeshBuilder.node(Models.bush_mesh(), tree_root)
 		bsh.position = p
