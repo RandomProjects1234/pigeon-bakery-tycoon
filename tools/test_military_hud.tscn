@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tools/test_military_hud.gd" id="1"]
+
+[node name="MilitaryHudTest" type="Node"]
+script = ExtResource("1")

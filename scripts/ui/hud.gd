@@ -35,6 +35,7 @@ var _dialog: Control = null
 var _order_panel: PanelContainer
 var _order_title: Label
 var _order_rows: VBoxContainer
+var _order_counts := {}
 var _order_sig := ""
 var _raid_panel: PanelContainer
 var _raid_label: Label
@@ -878,22 +879,27 @@ func _update_military_panels() -> void:
 		var secs := maxi(0, int(ceil(float(mil.order["time"]))))
 		_order_title.text = "ORDER  %d:%02d" % [secs / 60, secs % 60]
 		_order_title.add_theme_color_override("font_color", Color(1, 0.4, 0.35) if secs <= 20 else Color(1, 0.95, 0.7))
-		var sig := str(mil.order["got"])
+		var sig := str(mil.order["need"])
 		if sig != _order_sig:
 			_order_sig = sig
+			_order_counts.clear()
 			for c in _order_rows.get_children():
+				_order_rows.remove_child(c)
 				c.queue_free()
 			for t in mil.order["need"]:
 				var row := HBoxContainer.new()
 				row.add_theme_constant_override("separation", 6)
 				row.add_child(UiKit.tex(str(t), 30))
-				var got := int(mil.order["got"][t])
-				var need := int(mil.order["need"][t])
-				var done := got >= need
-				row.add_child(UiKit.label("%d / %d" % [mini(got, need), need], 20, Color(0.6, 1, 0.5) if done else Color(1, 1, 1), 6))
+				var count := UiKit.label("", 20, Color(1, 1, 1), 6)
+				row.add_child(count)
+				_order_counts[t] = count
 				_order_rows.add_child(row)
-			_order_panel.offset_left = -16
-			_order_panel.reset_size()
+		for t in mil.order["need"]:
+			var got := int(mil.order["got"].get(t, 0))
+			var need := int(mil.order["need"][t])
+			var count: Label = _order_counts[t]
+			count.text = "%d / %d" % [mini(got, need), need]
+			count.add_theme_color_override("font_color", Color(0.6, 1, 0.5) if got >= need else Color(1, 1, 1))
 	var raid_text := ""
 	if sec != null and Game.playing:
 		if sec.raid_active:
@@ -910,6 +916,25 @@ func _update_military_panels() -> void:
 		_raid_panel.offset_left = -w * 0.5
 		_raid_panel.offset_right = w * 0.5
 	_raid_panel.offset_top = 200 if _portrait else 88
+	if show_order:
+		_layout_order_panel()
+
+
+func _layout_order_panel() -> void:
+	# Set both edges explicitly: resetting only the left edge lets Godot's
+	# container minimum size push the right edge past the viewport.
+	var panel_size := _order_panel.get_combined_minimum_size()
+	var top := maxf(92.0, _money_pill.offset_top + _money_pill.size.y + 12.0)
+	if _global_pill.visible:
+		top = maxf(top, _global_pill.offset_top + _global_pill.size.y + 12.0)
+	if _portrait:
+		top = maxf(top, _obj_panel.offset_top + _obj_panel.size.y + 12.0)
+		if _raid_panel.visible:
+			top = maxf(top, _raid_panel.offset_top + _raid_panel.size.y + 12.0)
+	_order_panel.offset_left = -16.0 - panel_size.x
+	_order_panel.offset_right = -16.0
+	_order_panel.offset_top = top
+	_order_panel.offset_bottom = top + panel_size.y
 
 
 ## Story dialog at the bottom of the screen. Tap to advance.
