@@ -12,6 +12,7 @@ var _clock := 0.0
 
 func _ready() -> void:
 	randomize()
+	_mobile_web_tuning()
 	if bool(Game.dev["bake_icons"]):
 		var baker := IconBaker.new()
 		add_child(baker)
@@ -39,6 +40,20 @@ func _ready() -> void:
 	_shots = Game.dev["autoshot"]
 	if bool(Game.dev["auto"]):
 		world.player.bot = PlayerBot.new(world)
+
+
+## Phones in a browser: render 3D below the (often 3x) screen resolution, no
+## MSAA and a smaller shadow map. Keeps memory low so the mobile browser
+## doesn't kill and reload the tab.
+func _mobile_web_tuning() -> void:
+	var mobile := OS.has_feature("web") and (OS.has_feature("web_android") or OS.has_feature("web_ios"))
+	if not mobile and not OS.get_cmdline_user_args().has("--mobile-perf"):
+		return
+	var vp := get_viewport()
+	vp.msaa_3d = Viewport.MSAA_DISABLED
+	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+	vp.scaling_3d_scale = 0.6
+	RenderingServer.directional_shadow_atlas_set_size(1024, true)
 
 
 ## --pose pigeon: close-up line-up of the pigeon variants (for checking the model).
