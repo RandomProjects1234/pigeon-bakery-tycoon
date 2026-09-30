@@ -26,6 +26,41 @@ body {
 	outline: none;
 }
 
+/* Keep the control outside the canvas so it also works on the title screen. */
+#fullscreen-button {
+	position: fixed;
+	right: max(12px, env(safe-area-inset-right));
+	bottom: max(12px, env(safe-area-inset-bottom));
+	z-index: 10;
+	min-height: 44px;
+	padding: 10px 16px;
+	border: 2px solid white;
+	border-radius: 14px;
+	background: #8860d0;
+	color: white;
+	box-shadow: 0 3px 0 #533589;
+	font: bold 14px/1.2 Arial, sans-serif;
+	cursor: pointer;
+	touch-action: manipulation;
+}
+
+#fullscreen-button:hover { background: #7550bb; }
+#fullscreen-button:focus-visible { outline: 3px solid #ffca55; outline-offset: 3px; }
+#fullscreen-button:disabled { opacity: 0.65; cursor: wait; }
+#fullscreen-button[hidden], #fullscreen-message[hidden] { display: none; }
+
+#fullscreen-message {
+	position: fixed;
+	right: max(12px, env(safe-area-inset-right));
+	bottom: calc(max(12px, env(safe-area-inset-bottom)) + 58px);
+	z-index: 10;
+	max-width: min(280px, calc(100vw - 48px));
+	padding: 10px 12px;
+	border-radius: 10px;
+	background: #34234f;
+	font: 14px/1.4 Arial, sans-serif;
+}
+
 #status, #status-splash, #status-progress {
 	position: absolute;
 	left: 0;
@@ -108,6 +143,77 @@ body {
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
+
+		<button id="fullscreen-button" type="button" aria-pressed="false" title="Enter fullscreen" hidden>Fullscreen</button>
+		<div id="fullscreen-message" role="status" aria-live="polite" hidden></div>
+		<script>
+(function () {
+	const button = document.getElementById('fullscreen-button');
+	const message = document.getElementById('fullscreen-message');
+	const canvas = document.getElementById('canvas');
+	const page = document.documentElement;
+	const requestFullscreen = page.requestFullscreen || page.webkitRequestFullscreen;
+	const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+	if (!requestFullscreen || !exitFullscreen ||
+		(document.fullscreenEnabled === false && !page.webkitRequestFullscreen)) {
+		return;
+	}
+	button.hidden = false;
+	let messageTimeout;
+
+	function isFullscreen() {
+		return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+	}
+
+	function updateButton() {
+		const active = isFullscreen();
+		button.textContent = active ? 'Exit fullscreen' : 'Fullscreen';
+		button.title = active ? 'Exit fullscreen (Esc)' : 'Enter fullscreen';
+		button.setAttribute('aria-pressed', String(active));
+	}
+
+	function showFailure() {
+		clearTimeout(messageTimeout);
+		message.textContent = 'Fullscreen could not be changed. Try again or use your browser\'s fullscreen option.';
+		message.hidden = false;
+		messageTimeout = setTimeout(() => { message.hidden = true; }, 5000);
+	}
+
+	// Do not pass button touches or keyboard activation through to the game.
+	for (const eventName of ['pointerdown', 'pointerup', 'keydown', 'keyup']) {
+		button.addEventListener(eventName, (event) => event.stopPropagation());
+	}
+	button.addEventListener('click', async (event) => {
+		event.stopPropagation();
+		button.disabled = true;
+		message.hidden = true;
+		try {
+			if (isFullscreen()) {
+				await exitFullscreen.call(document);
+			} else {
+				// Fullscreen the page so the exit control stays available over the game.
+				await requestFullscreen.call(page);
+			}
+			canvas.focus();
+		} catch (error) {
+			showFailure();
+		} finally {
+			button.disabled = false;
+			updateButton();
+		}
+	});
+	document.addEventListener('fullscreenchange', updateButton);
+	document.addEventListener('webkitfullscreenchange', updateButton);
+	document.addEventListener('fullscreenerror', showFailure);
+	document.addEventListener('webkitfullscreenerror', showFailure);
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape' && isFullscreen()) {
+			Promise.resolve(exitFullscreen.call(document)).catch(showFailure);
+		}
+	});
+	updateButton();
+}());
+		</script>
 
 		<script src="index.js"></script>
 		<script>
