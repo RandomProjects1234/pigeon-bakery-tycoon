@@ -91,6 +91,8 @@ func _task_done() -> bool:
 		"serve":
 			return world.register.queue.is_empty() or _hold > 6.0
 		"crow":
+			if world.location == "hq":
+				return _hold > 0.5 or float(task["t"]) > 3.0
 			return world.crows.is_empty() and world.security.raiders.is_empty()
 		"table":
 			var tb := task["st"] as CafeTable
@@ -126,6 +128,14 @@ func _decide() -> void:
 	task = {}
 	var pl := world.player
 	var reg := world.register
+	# at the HQ: fight ground crows, otherwise hang around the command center
+	if world.location == "hq":
+		var wc := world.war.nearest_enemy(pl.global_position, 200.0, "ground")
+		if wc != null:
+			_assign("crow", wc.global_position)
+		else:
+			_assign("idle", CrowWar.ORIGIN + Vector3(0, 0, 9))
+		return
 	# 0. raiders
 	var raider := world.security.nearest(pl.global_position, 200.0)
 	if raider != null:

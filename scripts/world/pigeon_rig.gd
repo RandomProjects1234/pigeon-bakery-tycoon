@@ -47,7 +47,7 @@ static func palette(v: String) -> Dictionary:
 				"bar": Color(0.95, 0.78, 0.25), "tip": Color(0.9, 0.9, 0.93), "eye": Color(0.2, 0.15, 0.1),
 				"feet": Color(0.95, 0.55, 0.6), "beak": Color(0.95, 0.75, 0.4), "cere": Color(1, 1, 1),
 				"sheen1": Color(0.95, 0.9, 0.7), "sheen2": Color(0.98, 0.85, 0.5)}
-		"crow", "crow_boss":
+		"crow", "crow_boss", "crow_bomber", "crow_heavy", "crow_king":
 			return {"body": Color(0.12, 0.12, 0.15), "belly": Color(0.1, 0.1, 0.13), "wing": Color(0.16, 0.16, 0.2),
 				"neck": Color(0.1, 0.1, 0.13), "head": Color(0.13, 0.13, 0.16), "tail": Color(0.1, 0.1, 0.12),
 				"bar": Color(0.2, 0.2, 0.26), "tip": Color(0.08, 0.08, 0.1), "eye": Color(0.9, 0.85, 0.3),
@@ -231,6 +231,68 @@ func _accessories(v: String) -> void:
 				b.sphere(0.018, Vector3(0.1, -0.1, -0.11), Color(0.15, 0.15, 0.18))
 				return b.build()), head)
 			hs.position = Vector3(0, 0.05, 0)
+		"pilot":      # flying goggles + red scarf
+			var gear := MeshBuilder.node(Models.cached("pg_pilot", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				var leather := Color(0.45, 0.28, 0.15)
+				b.cyl(0.14, 0.14, 0.03, Vector3(0, 0.06, 0), leather, Vector3.ZERO, 12)
+				for side in [-1, 1]:
+					b.cyl(0.04, 0.04, 0.03, Vector3(0.05 * side, 0.08, -0.12), Color(0.55, 0.8, 0.95), Vector3(90, 0, 0), 10)
+					b.torus(0.042, 0.01, Vector3(0.05 * side, 0.08, -0.13), leather, Vector3(90, 0, 0))
+				return b.build()), head)
+			gear.position = Vector3.ZERO
+			var scarf := MeshBuilder.node(Models.cached("pg_scarf", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				var red := Color(0.9, 0.15, 0.15)
+				b.torus(0.12, 0.035, Vector3.ZERO, red, Vector3(-60, 0, 0))
+				b.box(Vector3(0.06, 0.02, 0.3), Vector3(0.05, 0.03, 0.22), red, Vector3(10, 15, 0))
+				return b.build()), body)
+			scarf.position = Vector3(0, 0.22, -0.22)
+		"crow_bomber":  # goggles + bomb bag
+			var g2 := MeshBuilder.node(Models.cached("pg_bomber", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				for side in [-1, 1]:
+					b.cyl(0.045, 0.045, 0.03, Vector3(0.06 * side, 0.07, -0.11), Color(0.9, 0.4, 0.1), Vector3(90, 0, 0), 10)
+				b.cyl(0.14, 0.14, 0.03, Vector3(0, 0.06, 0), Color(0.25, 0.25, 0.3), Vector3.ZERO, 12)
+				return b.build()), head)
+			g2.position = Vector3.ZERO
+			var bag := MeshBuilder.node(Models.cached("pg_bombbag", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				b.sphere(0.14, Vector3(0, 0, 0), Color(0.55, 0.42, 0.28), Vector3(1.0, 0.8, 1.2))
+				b.cyl(0.05, 0.08, 0.06, Vector3(0, 0.1, 0), Color(0.45, 0.33, 0.2), Vector3.ZERO, 8)
+				return b.build()), body)
+			bag.position = Vector3(0, -0.22, 0.05)
+		"crow_heavy":   # spiked steel helmet + chest plate
+			var helm := MeshBuilder.node(Models.cached("pg_heavy_helm", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				var steel := Color(0.55, 0.57, 0.62)
+				b.dome(0.16, Vector3.ZERO, steel, Vector3(1.0, 0.85, 1.05), 12)
+				b.cyl(0.0, 0.03, 0.12, Vector3(0, 0.17, 0), steel.darkened(0.2), Vector3.ZERO, 6)
+				b.box(Vector3(0.03, 0.12, 0.02), Vector3(0, -0.02, -0.15), steel.darkened(0.2))
+				return b.build()), head)
+			helm.position = Vector3(0, 0.05, 0)
+			var plate := MeshBuilder.node(Models.cached("pg_heavy_plate", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				b.sphere(0.5, Vector3.ZERO, Color(0.5, 0.52, 0.57), Vector3(0.4, 0.34, 0.1))
+				b.cyl(0.03, 0.03, 0.02, Vector3(0, 0, -0.05), Color(0.8, 0.15, 0.15), Vector3(90, 0, 0), 6)
+				return b.build()), body)
+			plate.position = Vector3(0, 0.08, -0.3)
+		"crow_king":    # giant crown + royal cape
+			var crown2 := MeshBuilder.node(Models.cached("pg_king_crown", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				b.cyl(0.12, 0.11, 0.08, Vector3(0, 0, 0), Models.C_GOLD, Vector3.ZERO, 10)
+				for k in 6:
+					var a := k * TAU / 6.0
+					b.cyl(0.0, 0.03, 0.09, Vector3(cos(a) * 0.1, 0.08, sin(a) * 0.1), Models.C_GOLD, Vector3.ZERO, 4)
+					b.sphere(0.018, Vector3(cos(a) * 0.12, 0.02, sin(a) * 0.12), Color(0.9, 0.1, 0.2))
+				return b.build()), head)
+			crown2.position = Vector3(0, 0.15, 0)
+			var cape := MeshBuilder.node(Models.cached("pg_cape", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				b.box(Vector3(0.5, 0.03, 0.6), Vector3(0, 0, 0), Color(0.7, 0.05, 0.1), Vector3(-15, 0, 0))
+				b.box(Vector3(0.52, 0.035, 0.08), Vector3(0, 0.02, -0.28), Color(0.95, 0.95, 0.95), Vector3(-15, 0, 0))
+				return b.build()), body)
+			cape.position = Vector3(0, 0.2, 0.15)
 		"crow_boss":
 			var band := MeshBuilder.node(Models.cached("pg_bandana", func() -> ArrayMesh:
 				var b := MeshBuilder.new()

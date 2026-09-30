@@ -24,6 +24,28 @@ func update() -> void:
 	_advance_tutorial(st, player)
 	target = Vector3.INF
 	step_label = ""
+	var cw: CrowWar = world.get("war")
+	if cw != null and cw.active():
+		if str(world.get("location")) == "hq":
+			if cw.phase == "wave":
+				text = ("FINAL BATTLE: defeat the Crow King! " if cw.final_wave else "Defend the HQ! ") + "(%d crows)" % cw.alive()
+				icon = "portrait_crow"
+				var g := cw.nearest_enemy(player.global_position, 200.0, "ground")
+				if g != null:
+					target = g.global_position + Vector3(0, 0.6, 0)
+			elif cw.phase == "warn":
+				text = "Crow wave incoming in %d!" % int(ceil(cw.warn_t))
+				icon = "portrait_crow"
+			else:
+				text = "Build pigeon weapons on the pads. Next wave in %ds" % int(ceil(cw.next_wave))
+				icon = "turret"
+			return
+		text = "The Crow War: take the limo to defend your HQ"
+		icon = "hq"
+		var limo: Node3D = st.get("limo", null)
+		if limo != null:
+			target = (limo as Limo).pad_pos("ride")
+		return
 	if bool(Game.ceo["deal"]):
 		text = "CEO: grow your global empire (globe button)"
 		icon = "globe"

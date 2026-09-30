@@ -73,6 +73,7 @@ func _ready() -> void:
 	_build_hand()
 	_build_military_panels()
 	_build_global_pill()
+	_build_war_panel()
 	Game.money_changed.connect(_on_money)
 	Game.upgrades_changed.connect(_refresh_upgrades)
 	Game.zone_unlocked.connect(func(_id: String) -> void: _refresh_level())
@@ -260,6 +261,7 @@ func _process(delta: float) -> void:
 	_update_edge_arrow()
 	_update_hand(delta)
 	_update_military_panels()
+	_update_war_panel()
 
 
 var _portrait := false
@@ -743,8 +745,15 @@ func open_global() -> void:
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD
 	info.custom_minimum_size = Vector2(560, 0)
 	head.add_child(info)
+	if Game.has_flag("war_started") and not bool(Game.war["won"]):
+		var go := UiKit.button("Go to HQ Tower" if str(Game.world.get("location")) != "hq" else "Back to the bakery", UiKit.RED, Vector2(280, 56), 22)
+		go.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		go.pressed.connect(func() -> void:
+			close_modal()
+			Game.world.call("travel", "hq" if str(Game.world.get("location")) != "hq" else "bakery"))
+		vb.add_child(go)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(720, 360)
+	scroll.custom_minimum_size = Vector2(720, 330)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	vb.add_child(scroll)
 	var list := VBoxContainer.new()
@@ -760,7 +769,15 @@ func open_global() -> void:
 		for r in rows:
 			var i: int = r["i"]
 			var lvl := int(cities.get(str(Investors.CITIES[i][0]), 1))
-			(r["lvl"] as Label).text = "Lv %d  -  $%s/s" % [lvl, Game.fmt(int(Investors.city_income(i, lvl)))]
+			var bombed := (Game.war["bombed"] as Dictionary).has(str(Investors.CITIES[i][0]))
+			(r["lvl"] as Label).text = "Lv %d  -  $%s/s%s" % [lvl, Game.fmt(int(Investors.city_income(i, lvl) * (0.3 if bombed else 1.0))), "  POOP-BOMBED!" if bombed else ""]
+			(r["lvl"] as Label).add_theme_color_override("font_color", Color(0.85, 0.3, 0.25) if bombed else Color(0.35, 0.4, 0.6))
+			var cb: Button = r["clean"]
+			cb.visible = bombed
+			if bombed:
+				var cc := CrowWar.clean_cost(i)
+				cb.text = "Clean $" + Game.fmt(cc)
+				UiKit.style_button(cb, UiKit.ORANGE if Game.money >= cc else UiKit.GREY)
 			var b: Button = r["btn"]
 			if lvl >= 10:
 				b.text = "MAX"
@@ -783,6 +800,17 @@ func open_global() -> void:
 		var lvl_l := UiKit.label("", 20, Color(0.35, 0.4, 0.6), 0)
 		lvl_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hb.add_child(lvl_l)
+		var clean := UiKit.button("", UiKit.ORANGE, Vector2(130, 50), 18)
+		var cidx := i
+		clean.pressed.connect(func() -> void:
+			var cname := str(Investors.CITIES[cidx][0])
+			if Game.spend(CrowWar.clean_cost(cidx)):
+				(Game.war["bombed"] as Dictionary).erase(cname)
+				Sfx.play("sparkle", -4.0)
+				refresh.call()
+			else:
+				Sfx.play("nope", -6.0))
+		hb.add_child(clean)
 		var btn := UiKit.button("", UiKit.GREEN, Vector2(150, 50), 20)
 		var idx := i
 		btn.pressed.connect(func() -> void:
@@ -796,7 +824,7 @@ func open_global() -> void:
 			else:
 				Sfx.play("nope", -6.0))
 		hb.add_child(btn)
-		rows.append({"i": i, "lvl": lvl_l, "btn": btn})
+		rows.append({"i": i, "lvl": lvl_l, "btn": btn, "clean": clean})
 	refresh.call()
 
 
@@ -1047,3 +1075,218 @@ func military_offer(mil: Military) -> void:
 	acc.pressed.connect(on_accept)
 	dec.pressed.connect(on_decline)
 	_modal.tree_exiting.connect(on_closed)
+
+
+# ------------------------------------------------------------ Crow War --
+var _fader: ColorRect
+var _war_panel: PanelContainer
+var _war_hp: ProgressBar
+var _war_shield: ProgressBar
+var _war_clan: ProgressBar
+var _war_status: Label
+var _shield_row: Control
+
+
+func _bar(color: Color) -> ProgressBar:
+	var pb := ProgressBar.new()
+	pb.custom_minimum_size = Vector2(190, 16)
+	pb.show_percentage = false
+	pb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var fill := UiKit.panel_style(color, 8, 0, Color.BLACK, false)
+	fill.content_margin_left = 0
+	fill.content_margin_right = 0
+	fill.content_margin_top = 0
+	fill.content_margin_bottom = 0
+	pb.add_theme_stylebox_override("fill", fill)
+	return pb
+
+
+func _build_war_panel() -> void:
+	_fader = ColorRect.new()
+	_fader.color = Color(0, 0, 0, 0)
+	_fader.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fader.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_fader)
+	_war_panel = PanelContainer.new()
+	_war_panel.position = Vector2(100, 116)
+	_war_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_war_panel.add_theme_stylebox_override("panel", UiKit.panel_style(Color(0.12, 0.1, 0.18, 0.88), 18))
+	root.add_child(_war_panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 4)
+	_war_panel.add_child(vb)
+	var rows := [["HQ", Color(0.35, 0.9, 0.35)], ["Shield", Color(0.4, 0.7, 1.0)], ["Crow Clan", Color(0.85, 0.2, 0.25)]]
+	for r in rows:
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 8)
+		vb.add_child(hb)
+		var l := UiKit.label(str(r[0]), 17, Color(1, 1, 1), 4)
+		l.custom_minimum_size = Vector2(88, 0)
+		hb.add_child(l)
+		var pb := _bar(r[1] as Color)
+		hb.add_child(pb)
+		match str(r[0]):
+			"HQ":
+				_war_hp = pb
+			"Shield":
+				_war_shield = pb
+				_shield_row = hb
+			_:
+				_war_clan = pb
+	_war_status = UiKit.label("", 17, Color(1, 0.9, 0.5), 4)
+	vb.add_child(_war_status)
+	_war_panel.visible = false
+
+
+func _update_war_panel() -> void:
+	if Game.world == null or _war_panel == null:
+		return
+	var cw: CrowWar = Game.world.get("war")
+	var show := cw != null and cw.active() and str(Game.world.get("location")) == "hq" and Game.playing and _modal == null
+	_war_panel.visible = show
+	if not show:
+		return
+	_war_hp.max_value = cw.max_hp()
+	_war_hp.value = cw.hq_hp
+	var smax := cw.shield_max()
+	_shield_row.visible = smax > 0.0
+	_war_shield.max_value = maxf(1.0, smax)
+	_war_shield.value = cw.shield_hp
+	_war_clan.max_value = 100.0
+	_war_clan.value = float(Game.war["strength"])
+	match cw.phase:
+		"wave":
+			_war_status.text = "WAVE %d  -  %d crows" % [cw.wave_number(), cw.alive()]
+		"warn":
+			_war_status.text = "Wave %d incoming: %ds" % [cw.wave_number(), int(ceil(cw.warn_t))]
+		_:
+			_war_status.text = "Next wave in %ds" % int(ceil(cw.next_wave))
+
+
+## Fade the screen to black (true) or back in (false). Awaitable.
+func fade(to_black: bool) -> void:
+	var tw := create_tween()
+	tw.tween_property(_fader, "color:a", 1.0 if to_black else 0.0, 0.35)
+	await tw.finished
+
+
+func war_pad_menu(cw: CrowWar, slot: int) -> void:
+	if cw.weapons.has(slot):
+		_war_upgrade_menu(cw, slot)
+		return
+	var vb := _open_modal("WarBuild", "BUILD A DEFENCE", 780)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(740, 420)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vb.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 6)
+	scroll.add_child(list)
+	for t in WarData.WEAPON_ORDER:
+		var d: Dictionary = WarData.WEAPONS[t]
+		var row := PanelContainer.new()
+		row.add_theme_stylebox_override("panel", UiKit.panel_style(Color(0.95, 0.93, 0.99), 16, 0, Color.BLACK, false))
+		list.add_child(row)
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 10)
+		row.add_child(hb)
+		hb.add_child(UiKit.tex(str(d["icon"]), 58))
+		var info := VBoxContainer.new()
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hb.add_child(info)
+		info.add_child(UiKit.dark_label(str(d["name"]), 22))
+		var desc := UiKit.label(str(d["desc"]), 16, Color(0.45, 0.42, 0.55), 0)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+		desc.custom_minimum_size = Vector2(420, 0)
+		info.add_child(desc)
+		var cost := int(d["cost"])
+		var b := UiKit.button("$" + Game.fmt(cost), UiKit.GREEN if Game.money >= cost else UiKit.GREY, Vector2(150, 56), 22)
+		var tt: String = t
+		b.pressed.connect(func() -> void:
+			if cw.build_weapon(slot, tt):
+				close_modal()
+				toast("%s built!" % str(WarData.WEAPONS[tt]["name"]), str(WarData.WEAPONS[tt]["icon"]))
+			else:
+				Sfx.play("nope", -6.0))
+		hb.add_child(b)
+
+
+func _war_upgrade_menu(cw: CrowWar, slot: int) -> void:
+	var w: HQWeapon = cw.weapons[slot]
+	var d: Dictionary = w.def()
+	var vb := _open_modal("WarUpgrade", str(d["name"]).to_upper(), 620)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 14)
+	vb.add_child(hb)
+	hb.add_child(UiKit.tex(str(d["icon"]), 96))
+	var info := UiKit.dark_label("", 22)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD
+	info.custom_minimum_size = Vector2(440, 0)
+	hb.add_child(info)
+	var btn := UiKit.button("", UiKit.GREEN, Vector2(260, 64), 24)
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vb.add_child(btn)
+	var refresh := func() -> void:
+		var line := "Level %d / %d\n%s" % [w.level, WarData.MAX_LEVEL, str(d["desc"])]
+		if str(d["target"]) != "none":
+			line += "\nDamage %.1f  -  range %d m" % [w.damage(), int(w.range_m())]
+		info.text = line
+		if w.level >= WarData.MAX_LEVEL:
+			btn.text = "MAX LEVEL"
+			btn.disabled = true
+		else:
+			var c := WarData.upgrade_cost(w.type, w.level)
+			btn.text = "Upgrade  $" + Game.fmt(c)
+			UiKit.style_button(btn, UiKit.GREEN if Game.money >= c else UiKit.GREY)
+	refresh.call()
+	btn.pressed.connect(func() -> void:
+		if cw.upgrade_weapon(slot):
+			refresh.call()
+		else:
+			Sfx.play("nope", -6.0))
+
+
+func war_command_menu(cw: CrowWar) -> void:
+	var vb := _open_modal("WarCommand", "COMMAND CENTER", 700)
+	var rows: Array[Dictionary] = []
+	for k in WarData.HQ_UPGRADE_ORDER:
+		var d: Dictionary = WarData.HQ_UPGRADES[k]
+		var row := PanelContainer.new()
+		row.add_theme_stylebox_override("panel", UiKit.panel_style(Color(0.93, 0.95, 1.0), 16, 0, Color.BLACK, false))
+		vb.add_child(row)
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 10)
+		row.add_child(hb)
+		hb.add_child(UiKit.tex(str(d["icon"]), 54))
+		var info := VBoxContainer.new()
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hb.add_child(info)
+		info.add_child(UiKit.dark_label(str(d["name"]), 22))
+		var lvl := UiKit.label("", 16, Color(0.45, 0.42, 0.55), 0)
+		info.add_child(lvl)
+		var b := UiKit.button("", UiKit.GREEN, Vector2(150, 54), 22)
+		hb.add_child(b)
+		rows.append({"k": k, "lvl": lvl, "btn": b})
+	var refresh := func() -> void:
+		for r in rows:
+			var k: String = r["k"]
+			var d: Dictionary = WarData.HQ_UPGRADES[k]
+			var lv := cw.upg(k)
+			(r["lvl"] as Label).text = "%s  (level %d / %d)" % [str(d["desc"]), lv, int(d["max"])]
+			var b: Button = r["btn"]
+			if lv >= int(d["max"]):
+				b.text = "MAX"
+				b.disabled = true
+			else:
+				var c := WarData.hq_upgrade_cost(k, lv)
+				b.text = "$" + Game.fmt(c)
+				UiKit.style_button(b, UiKit.GREEN if Game.money >= c else UiKit.GREY)
+	for r in rows:
+		var key: String = r["k"]
+		(r["btn"] as Button).pressed.connect(func() -> void:
+			if cw.buy_hq_upgrade(key):
+				refresh.call()
+			else:
+				Sfx.play("nope", -6.0))
+	refresh.call()

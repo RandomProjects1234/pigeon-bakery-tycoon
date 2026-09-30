@@ -24,6 +24,7 @@ var _badge: Texture2D
 var _count: Label
 var _t := 0.0
 var _stage := 0
+var mode := "global"     # "global" (the CEO ending) or "war" (Crow Clan defeated)
 
 
 func _ready() -> void:
@@ -62,6 +63,9 @@ func _ready() -> void:
 	skip.offset_top = 16
 	skip.pressed.connect(_skip)
 	_root.add_child(skip)
+	if mode == "war":
+		title.text = "VICTORY!"
+		_count.text = "The Crow Clan is destroyed"
 	for i in Investors.CITIES.size():
 		var c: Array = Investors.CITIES[i]
 		_pins.append({"pos": Vector2(float(c[1]), float(c[2])), "t": 1.2 + i * 0.45, "name": str(c[0])})
@@ -70,6 +74,11 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
+	if _stage == 0 and mode == "war":
+		_map.queue_redraw()
+		if _t > 1.5:
+			_show_war_card()
+		return
 	if _stage == 0:
 		var shown := 0
 		for p in _pins:
@@ -84,6 +93,8 @@ func _process(delta: float) -> void:
 		_map.queue_redraw()
 		if _t > float(_pins[_pins.size() - 1]["t"]) + 2.2:
 			_show_ceo()
+	elif Game.test_mode() and _t > 3.0 and _stage == 1 and not Game.dev["show_ui"] and mode == "war":
+		_finish(false)
 	elif Game.test_mode() and _t > 3.0 and _stage == 1:
 		if bool(Game.dev["show_ui"]) or OS.get_cmdline_user_args().has("--credits"):
 			_show_credits()
@@ -173,6 +184,44 @@ func _show_ceo() -> void:
 		tt.timeout.connect(func() -> void: Sfx.play("coin", -6.0, 1.0 + i * 0.1))
 
 
+func _show_war_card() -> void:
+	_stage = 1
+	_t = 0.0
+	var c := CenterContainer.new()
+	c.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root.add_child(c)
+	var p := PanelContainer.new()
+	p.custom_minimum_size = Vector2(760, 0)
+	p.add_theme_stylebox_override("panel", UiKit.panel_style(Color(1, 0.98, 0.94), 32, 6, Color(0.42, 0.5, 0.3)))
+	c.add_child(p)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	p.add_child(vb)
+	var t := UiKit.label("THE CROW CLAN IS DEFEATED!", 40, Color(0.42, 0.5, 0.3), 10)
+	t.add_theme_color_override("font_outline_color", Color(1, 1, 1))
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(t)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 30)
+	vb.add_child(row)
+	row.add_child(_person(_badge, "You", "CEO & war hero"))
+	row.add_child(_person(Items.icon("portrait_general"), "General Coo", "Pigeon Army"))
+	row.add_child(_person(Items.icon("portrait_crow"), "The Crow King", "defeated"))
+	var msg := UiKit.dark_label("After %d waves, the skies are clear. %s feeds the whole world, and no crow will ever poop on a pigeon restaurant again." % [int(Game.war["wave"]), Game.company], 22)
+	msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	msg.autowrap_mode = TextServer.AUTOWRAP_WORD
+	msg.custom_minimum_size = Vector2(700, 0)
+	vb.add_child(msg)
+	var nxt := UiKit.button("Continue", UiKit.GREEN, Vector2(220, 64), 26)
+	nxt.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	nxt.pressed.connect(func() -> void:
+		c.queue_free()
+		_show_credits())
+	vb.add_child(nxt)
+	UiKit.pop(p, 0.6)
+
+
 func _person(tex: Texture2D, name_: String, role: String) -> Control:
 	var vb := VBoxContainer.new()
 	vb.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -206,7 +255,7 @@ func _show_credits() -> void:
 	vb.add_theme_constant_override("separation", 14)
 	_root.add_child(vb)
 	var lines: Array = [
-		["THE END", 90, Color(1, 0.8, 0.25)],
+		["THE REAL END" if mode == "war" else "THE END", 90, Color(1, 0.8, 0.25)],
 		["", 20, Color.WHITE],
 		["PIGEON BAKERY TYCOON", 40, Color(1, 1, 1)],
 		["", 10, Color.WHITE],
@@ -214,6 +263,7 @@ func _show_credits() -> void:
 		["The Pigeon from the photo, as the company logo", 26, Color(1, 1, 1)],
 		["General Coo and the Pigeon Army", 26, Color(1, 1, 1)],
 		["The Crow Clans (and their Boss)", 26, Color(1, 1, 1)],
+		["The Crow King (retired)" if mode == "war" else "", 26, Color(1, 1, 1)],
 		["Chip Chirpley and the investors of Crow's Nest", 26, Color(1, 1, 1)],
 		["Thousands of hungry pigeon customers", 26, Color(1, 1, 1)],
 		["", 10, Color.WHITE],
@@ -264,6 +314,10 @@ func _finish(new_branch: bool) -> void:
 		get_tree().reload_current_scene()
 		return
 	queue_free()
+	if mode == "war":
+		if Game.hud != null:
+			Game.hud.call("big_card", "Peace at last!", "The Crow Clan is gone", "Your empire is safe. Keep playing as long as you like.", "ui_crown")
+		return
 	if Game.test_mode() and OS.get_cmdline_user_args().has("--open-hq") and Game.hud != null:
 		Game.hud.call("open_global")
 		return

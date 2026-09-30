@@ -8,6 +8,7 @@ A mobile-style "arcade idle" tycoon (like the playable ads) built in Godot 4.4. 
 ![Crow raid](docs/raid.png)
 ![Crow's Nest](docs/crows_nest.png)
 ![Going global](docs/global.png)
+![The Crow War](docs/crow_war.png)
 
 **Play in your browser (phones too):** https://randomprojects1234.github.io/pigeon-bakery-tycoon/
 
@@ -64,6 +65,27 @@ Along the way you unlock:
 - **The offers:** each investor offers your terms, counters for more equity, or goes out. Accept, **counter** (they might agree, stand firm, or walk off) or walk away. With no deal, come back next season.
 - **The ending:** a deal takes the bakery **global**. The logo spreads across a world map, you become CEO alongside your investor, and it's THE END.
 - **After the ending:** keep playing as CEO from **Global HQ** (the globe button): run and upgrade restaurants in 20 cities at once, while your partner takes their share.
+
+## After the ending: The Crow War
+
+- **The briefing:** a while after you become CEO, General Coo calls. The Crow Clan is **poop-bombing your restaurants around the world** (bombed cities earn 70% less until cleaned) and sending its air force at your **HQ tower**. Ride the company limo from the outpost to the HQ.
+- **The waves** grow every time:
+  - poop **bombers** make passes over the tower;
+  - **commandos** land and peck it;
+  - armoured **heavies** hit much harder;
+  - a **Crow Warlord** boss comes every 5th wave.
+  - If the tower falls, the crows loot 10% of your money and the Clan recovers.
+- **Pigeon weapons** go on 12 pads. Each costs from $150K to $20M and has 5 upgrade levels:
+  - Seed Slingshot MkII;
+  - Baguette Cannon (splash);
+  - Feather Flak (anti-air);
+  - Coo-Coo Sonic Tower (shockwave that slows);
+  - Birdseed Missile Silo (homing);
+  - Umbrella Shield Dome (blocks poop);
+  - Pigeon Air Squadron (goggled pigeon fighters);
+  - Pigeon Tank Battalion.
+- **Command Center** upgrades: HQ armour, repair crew, your own bonk power, and crow radar.
+- **The finish:** every wave you win knocks the **Crow Clan** meter down and cleans two bombed cities. At 20% the **Crow King** attacks. Beat him and the Clan is destroyed for good. Raids stop everywhere, and it's THE REAL END.
 
 Events:
 
@@ -123,6 +145,7 @@ godot --headless --path . --export-release "Web" build/web/index.html
 | `--unlock endgame` | everything up to the statue, General Coo already met |
 | `--raid-in N` / `--offer-in N` | first crow raid / military order after N seconds |
 | `--nest` / `--nest-now` | count the game as finished / go straight onto Crow's Nest |
+| `--war-now` / `--maxed` / `--wave-in N` | start at the HQ in the Crow War / with a maxed base / first wave after N s |
 | `--show-ui` | show dialogs and offers in test runs (instead of auto-accepting) |
 
 Full headless balance run:

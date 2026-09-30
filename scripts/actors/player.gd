@@ -3,6 +3,7 @@ extends Carrier
 ## You: the bakery owner in the chef hat. Joystick (drag anywhere) or WASD.
 
 var locked := false
+var slow_t := 0.0     # poop-bombed: walk at half speed
 var bot: RefCounted = null     # PlayerBot when running with --auto
 var max_label: Label3D
 var _ring: MeshInstance3D
@@ -62,7 +63,8 @@ func _physics_process(delta: float) -> void:
 			v2 = _input_vec()
 	var yaw: float = world.get("cam_yaw") if world != null else 0.0
 	var dir := Vector3(v2.x, 0, v2.y).rotated(Vector3.UP, yaw)
-	var spd := Game.player_speed() * clampf(v2.length(), 0.0, 1.0)
+	slow_t = maxf(0.0, slow_t - delta)
+	var spd := Game.player_speed() * clampf(v2.length(), 0.0, 1.0) * (0.5 if slow_t > 0.0 else 1.0)
 	if dir.length() > 0.05:
 		velocity = dir.normalized() * spd
 	else:

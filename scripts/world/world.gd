@@ -25,6 +25,12 @@ var menu_mode := true
 var military: Military
 var security: Security
 var nest: CrowsNest
+var war: CrowWar
+var location := "bakery"    # "bakery" or "hq"
+var _limo: Limo = null
+var _war_t := 0.0
+var _war_briefing := false
+var _war_attack_cd := 0.0
 var _van: TvVan = null
 var _invite_t := 0.0
 var _inviting := false
@@ -55,6 +61,8 @@ func _ready() -> void:
 	security = Security.new(self)
 	nest = CrowsNest.new(self)
 	add_child(nest)
+	war = CrowWar.new(self)
+	add_child(war)
 	# saves that finished the game before the military update still get General Coo
 	if Game.is_unlocked("statue"):
 		Game.flags["won"] = true
@@ -118,6 +126,25 @@ func _ready() -> void:
 		_spawn_van(false)
 	if bool(Game.ceo["deal"]):
 		_init_cities()
+	if Game.has_flag("war_started"):
+		_spawn_limo(false)
+	if bool(Game.dev["war_now"]):
+		Game.ceo["deal"] = true
+		Game.ceo["seen_end"] = true
+		Game.ceo["investor"] = "duchess"
+		Game.ceo["equity"] = 15
+		_init_cities()
+		Game.flags["war_started"] = true
+		Game.flags["won"] = true
+		Game.flags["general_met"] = true
+		_spawn_limo(false)
+		travel.call_deferred("hq", false)
+		if bool(Game.dev["auto"]) or OS.get_cmdline_user_args().has("--maxed"):
+			# test run: one of every weapon so they all get exercised
+			for i in WarData.WEAPON_ORDER.size():
+				war.build_weapon.call_deferred(i, WarData.WEAPON_ORDER[i])
+			if OS.get_cmdline_user_args().has("--maxed"):
+				_max_war.call_deferred()
 	if bool(Game.dev["nest_now"]):
 		Game.flags["nest_invite"] = true
 		_spawn_van(false)
@@ -421,8 +448,10 @@ func global_income() -> float:
 	var total := 0.0
 	var cities: Dictionary = Game.ceo["cities"]
 	for i in Investors.CITIES.size():
-		var lvl := int(cities.get(str(Investors.CITIES[i][0]), 0))
-		total += Investors.city_income(i, lvl)
+		var cname := str(Investors.CITIES[i][0])
+		var lvl := int(cities.get(cname, 0))
+		var k := 0.3 if (Game.war["bombed"] as Dictionary).has(cname) else 1.0
+		total += Investors.city_income(i, lvl) * k
 	return total * (1.0 - float(Game.ceo["equity"]) / 100.0)
 
 
@@ -433,6 +462,92 @@ func _update_global_income(delta: float) -> void:
 	if _global_t >= 1.0:
 		_global_t -= 1.0
 		Game.add_money(int(global_income()))
+
+
+# -------------------------------------------------------- the Crow War --
+func _update_war_briefing(delta: float) -> void:
+	if _war_briefing or not Game.playing or Game.has_flag("war_started"):
+		return
+	if not bool(Game.ceo["deal"]) or not bool(Game.ceo["seen_end"]):
+		return
+	if Game.hud == null or bool(Game.hud.call("is_busy")):
+		return
+	_war_t += delta
+	if _war_t < 40.0:
+		return
+	_war_briefing = true
+	var lines: Array[String] = [
+		"CEO! General Coo here. Congratulations on going global... but we have a problem.",
+		"The Crow Clan has changed tactics. They are POOP-BOMBING your restaurants all over the world!",
+		"And their spies found your new HQ tower. They're sending their whole air force at it.",
+		"The raids will only get worse. You'll need real firepower: pigeon weapons, shields, an air squadron.",
+		"Your limo is waiting at the outpost. Get to the HQ, build defences, and let's destroy the Crow Clan for good!",
+	]
+	Game.hud.call("dialog", lines, "General Coo", "portrait_general", func() -> void:
+		Game.set_flag("war_started")
+		_spawn_limo(true)
+		war.bomb_cities(2)
+		Sfx.play("siren", -4.0)
+		Game.hud.call("big_card", "THE CROW WAR", "Defend your HQ", "Ride the limo to the HQ tower and build pigeon weapons.", "hq")
+		if _limo != null:
+			pan_to(_limo.global_position, 1.8))
+
+
+func _spawn_limo(animate: bool) -> void:
+	if _limo != null:
+		return
+	_limo = Limo.new()
+	add_child(_limo)
+	_limo.setup(self, {"id": "limo", "pos": Vector2(26.8, 3.4)})
+	_register_station(_limo)
+	if animate:
+		Fx.pop_in(_limo, 0.5)
+
+
+## Fade to black, move between the bakery and the HQ tower, fade back in.
+func travel(to: String, fade := true) -> void:
+	if to == location:
+		return
+	if fade and Game.hud != null:
+		await Game.hud.call("fade", true)
+	location = to
+	if to == "hq":
+		player.global_position = CrowWar.ORIGIN + CrowWar.SPAWN
+	else:
+		player.global_position = Vector3(26.8, 0, 6.8)
+	player.velocity = Vector3.ZERO
+	cam_target = player.global_position
+	_place_camera(1.0)
+	Sfx.play("horn", -6.0)
+	if fade and Game.hud != null:
+		Game.hud.call("fade", false)
+	if to == "hq" and Game.hud != null and not Game.has_flag("hq_visited"):
+		Game.set_flag("hq_visited")
+		Game.hud.call("toast", "Stand on a pad to build a pigeon weapon. Bonk crows yourself too!", "turret")
+
+
+## Test helper (--maxed): extra weapons, every weapon + HQ upgrade maxed.
+func _max_war() -> void:
+	for i in range(8, 12):
+		war.build_weapon(i, ["slingshot", "flak", "baguette", "missile"][i - 8])
+	for s in war.weapons:
+		for l in WarData.MAX_LEVEL:
+			war.upgrade_weapon(s)
+	for k in WarData.HQ_UPGRADE_ORDER:
+		for l in 8:
+			war.buy_hq_upgrade(k)
+
+
+func war_victory() -> void:
+	var lines: Array[String] = [
+		"YOU DID IT! The Crow King has fallen and the Crow Clan is finished!",
+		"Every pigeon in the world can eat in peace. Your restaurants are safe, and so is my army.",
+		"On behalf of the Pigeon Army... thank you, CEO. You are a legend.",
+	]
+	Game.hud.call("dialog", lines, "General Coo", "portrait_general", func() -> void:
+		var e := Ending.new()
+		e.mode = "war"
+		get_parent().add_child(e))
 
 
 func pan_to(p: Vector3, secs: float) -> void:
@@ -520,6 +635,15 @@ func _physics_process(delta: float) -> void:
 	for a in carriers:
 		for s in station_list:
 			s.service(a, delta)
+	_war_attack_cd -= delta
+	if location == "hq" and Game.playing and _war_attack_cd <= 0.0:
+		var dmg := 2.0 + 2.0 * war.upg("power")
+		var near := war.nearest_enemy(player.global_position, 1.8, "ground")
+		if near != null:
+			near.hit(dmg, player.global_position)
+			_war_attack_cd = 0.3
+			player.rig.swing()
+			Sfx.play("bonk", -3.0, randf_range(0.9, 1.1), 0.04)
 	_attack_cd -= delta
 	if Game.playing and not security.raiders.is_empty() and _attack_cd <= 0.0:
 		if security.hit_near(player.global_position, 1.5, 1) != null:
@@ -544,6 +668,8 @@ func _process(delta: float) -> void:
 	_update_intro(delta)
 	_update_nest_invite(delta)
 	_update_global_income(delta)
+	war.tick(delta)
+	_update_war_briefing(delta)
 	_obj_t -= delta
 	if _obj_t <= 0.0:
 		_obj_t = 0.15

@@ -218,6 +218,10 @@ def sfx():
     # slingshot twang
     t = t_arr(0.2)
     write("twang", sweep(900, 300, 0.2) * np.exp(-t / 0.06), 0.4)
+    # poop splat
+    t = t_arr(0.3)
+    sp2 = lowpass(noise(0.3), 900) * np.exp(-t / 0.07) + 0.6 * sweep(260, 90, 0.3) * np.exp(-t / 0.08)
+    write("splat", sp2, 0.6)
     # eating nom
     nom = np.zeros(int(0.4 * SR))
     for i in range(3):

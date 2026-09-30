@@ -24,7 +24,7 @@ func _init(w: Node) -> void:
 
 
 func enabled() -> bool:
-	return Game.has_flag("general_met") and Game.playing
+	return Game.has_flag("general_met") and Game.playing and not bool(Game.war["won"])
 
 
 func tick(delta: float) -> void:

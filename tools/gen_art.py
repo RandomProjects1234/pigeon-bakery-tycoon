@@ -472,6 +472,107 @@ def globe_icon():
     return g.done()
 
 
+def w_baguette():
+    g = G()
+    g.rect(14, 60, 70, 80, (110, 85, 60, 255), r=4)
+    g.ell(10, 70, 34, 94, (70, 55, 40, 255))
+    g.ell(52, 70, 76, 94, (70, 55, 40, 255))
+    g.poly([(30, 62), (80, 12), (94, 26), (46, 74)], (225, 150, 70, 255))
+    for k in range(3):
+        g.line([(50 + k * 12, 46 - k * 12), (60 + k * 12, 52 - k * 12)], (255, 220, 150, 255), 4)
+    return g.done()
+
+
+def w_flak():
+    g = G()
+    g.rect(22, 60, 78, 90, (120, 130, 150, 255), r=6)
+    for x in (30, 44, 58, 72):
+        g.line([(x, 62), (x + 14, 14)], (50, 50, 60, 255), 6)
+    g.poly([(8, 30), (26, 20), (22, 44)], WHITE, w=3)
+    return g.done()
+
+
+def w_sonic():
+    g = G()
+    g.line([(50, 92), (50, 40)], (170, 170, 180, 255), 8)
+    g.poly([(50, 40), (22, 16), (18, 50)], (250, 200, 50, 255))
+    g.poly([(50, 40), (78, 16), (82, 50)], (250, 200, 50, 255))
+    for r in (10, 18):
+        g.line([(50 - r, 70 - r), (50, 60 - r * 1.4), (50 + r, 70 - r)], (150, 90, 200, 255), 4)
+    return g.done()
+
+
+def w_missile():
+    g = G()
+    g.poly([(50, 4), (64, 26), (64, 72), (36, 72), (36, 26)], (245, 220, 130, 255))
+    g.poly([(36, 56), (20, 80), (36, 74)], (230, 80, 60, 255), w=3)
+    g.poly([(64, 56), (80, 80), (64, 74)], (230, 80, 60, 255), w=3)
+    g.poly([(40, 74), (50, 96), (60, 74)], (255, 160, 40, 255), w=3)
+    return g.done()
+
+
+def w_shield():
+    g = G()
+    g.poly([(6, 60), (50, 10), (94, 60)], (90, 160, 250, 255))
+    g.line([(50, 60), (50, 92)], INK, 6)
+    g.line([(50, 92), (40, 92)], INK, 6)
+    return g.done()
+
+
+def w_hangar():
+    g = G()
+    g.ell(20, 26, 80, 70, (200, 210, 220, 255))
+    g.poly([(8, 46), (92, 46), (92, 56), (8, 56)], (160, 170, 185, 255), w=4)
+    g.ell(36, 30, 64, 52, (110, 120, 130, 255), outline=None)
+    g.rect(40, 30, 60, 38, (130, 200, 240, 255), r=2, w=3)
+    g.poly([(46, 66), (54, 66), (58, 86), (42, 86)], (220, 60, 60, 255), w=3)
+    return g.done()
+
+
+def w_tank():
+    g = G()
+    g.rect(10, 56, 90, 84, (40, 40, 45, 255), r=12)
+    g.rect(16, 42, 84, 64, (100, 125, 75, 255), r=6)
+    g.rect(34, 28, 66, 46, (115, 140, 85, 255), r=6)
+    g.line([(64, 36), (94, 24)], (225, 150, 70, 255), 7)
+    return g.done()
+
+
+def w_armor():
+    g = G()
+    g.poly([(50, 6), (88, 18), (84, 58), (50, 94), (16, 58), (12, 18)], (170, 175, 190, 255))
+    g.line([(30, 34), (70, 34)], (120, 125, 140, 255), 5)
+    g.line([(30, 54), (70, 54)], (120, 125, 140, 255), 5)
+    return g.done()
+
+
+def w_repair():
+    g = G()
+    g.line([(24, 76), (64, 36)], (170, 170, 185, 255), 14)
+    g.ell(56, 14, 90, 48, (170, 170, 185, 255))
+    g.ell(66, 16, 82, 32, (255, 255, 255, 0), outline=None)
+    return g.done()
+
+
+def w_radar():
+    g = G()
+    g.ell(8, 8, 92, 92, (40, 90, 60, 255))
+    g.ell(28, 28, 72, 72, (60, 130, 85, 255), outline=None)
+    g.poly([(50, 50), (50, 8), (82, 22)], (130, 255, 150, 180), outline=None)
+    g.ell(64, 58, 72, 66, (255, 80, 80, 255), w=2)
+    return g.done()
+
+
+def hq_icon():
+    g = G()
+    g.rect(28, 14, 72, 92, (110, 160, 225, 255), r=4)
+    for y in (26, 42, 58, 74):
+        g.line([(34, y), (66, y)], (230, 240, 255, 255), 4)
+    g.rect(24, 8, 76, 16, (255, 205, 60, 255), r=2)
+    g.line([(62, 8), (62, 0)], INK, 3)
+    return g.done()
+
+
 def bubble():
     """Speech bubble for pigeon orders (white, soft outline, tail down)."""
     size = 128
@@ -625,6 +726,9 @@ def main():
         "fx_fill": fill_tex(), "fx_card": card_tex(),
         "military": military_icon(), "security": security_icon(), "turret": turret_icon(),
         "hire_guard": guard_icon(), "hire_runner": runner_icon(), "nest": nest_icon(), "globe": globe_icon(),
+        "w_baguette": w_baguette(), "w_flak": w_flak(), "w_sonic": w_sonic(), "w_missile": w_missile(),
+        "w_shield": w_shield(), "w_hangar": w_hangar(), "w_tank": w_tank(), "w_armor": w_armor(),
+        "w_repair": w_repair(), "w_radar": w_radar(), "hq": hq_icon(),
     }
     for name, im in icons.items():
         save(im, "icons", name + ".png")
