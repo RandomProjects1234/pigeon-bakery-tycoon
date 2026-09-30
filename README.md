@@ -6,6 +6,8 @@ A mobile-style "arcade idle" tycoon (like the playable ads) built in Godot 4.4. 
 ![Gameplay](docs/gameplay.png)
 ![Military order](docs/military.png)
 ![Crow raid](docs/raid.png)
+![Crow's Nest](docs/crows_nest.png)
+![Going global](docs/global.png)
 
 **Play in your browser (phones too):** https://randomprojects1234.github.io/pigeon-bakery-tycoon/
 
@@ -53,6 +55,15 @@ Along the way you unlock:
 - **Delivering:** drop the products on the depot's supply crate. Finish in time to get paid and climb the ranks, from Recruit Supplier to The General's Baker. Fail and your reputation drops. **Supply Runners** can be hired to haul orders for you.
 - **Crow Clan raids:** after a siren, a raid flies in from one side (with a bandana-wearing **Crow Boss** every third raid). They steal from shelves, machine trays, the cash pile and your **wallet** (the office safe).
 - **Defending:** walk into crows to bonk them. A knocked-out crow drops everything it stole, and you get a bounty. Build a **Security Booth**, hire **Guards** who chase crows, and place **Seed Slingshot** turrets around the base.
+
+## The finale: Crow's Nest
+
+- **The invite:** once you've bought everything and delivered a few military orders, Producer Pip invites you onto **Crow's Nest**, the TV show where rich pigeons invest in businesses (think Shark Tank). The TV van parks at your outpost; walk up the red carpet to go on air.
+- **The investors:** meet **Sir Reginald Featherstone** (top hat), **Goldie McBeak** (gold chain), **Duchess Dovington** (tiara) and the tough **Mr. Grim Quill**. Each judges your pitch against what your company is really worth.
+- **Your pitch:** pick how much money you want and how much of the company you'll give. The panel tells you what valuation that implies.
+- **The offers:** each investor offers your terms, counters for more equity, or goes out. Accept, **counter** (they might agree, stand firm, or walk off) or walk away. With no deal, come back next season.
+- **The ending:** a deal takes the bakery **global**. The logo spreads across a world map, you become CEO alongside your investor, and it's THE END.
+- **After the ending:** keep playing as CEO from **Global HQ** (the globe button): run and upgrade restaurants in 20 cities at once, while your partner takes their share.
 
 Events:
 
@@ -111,6 +122,7 @@ godot --headless --path . --export-release "Web" build/web/index.html
 | `--allow-save` | let test runs read and write the save |
 | `--unlock endgame` | everything up to the statue, General Coo already met |
 | `--raid-in N` / `--offer-in N` | first crow raid / military order after N seconds |
+| `--nest` / `--nest-now` | count the game as finished / go straight onto Crow's Nest |
 | `--show-ui` | show dialogs and offers in test runs (instead of auto-accepting) |
 
 Full headless balance run:

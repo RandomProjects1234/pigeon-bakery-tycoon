@@ -117,6 +117,8 @@ func _task_done() -> bool:
 			return pl.pile.is_full() or f.ripe_count() == 0
 		"idle":
 			return _hold > 1.0 or float(task["t"]) > 2.0
+		"nest":
+			return world.nest.running or bool(Game.ceo["deal"]) or _hold > 1.0
 	return true
 
 
@@ -128,6 +130,11 @@ func _decide() -> void:
 	var raider := world.security.nearest(pl.global_position, 200.0)
 	if raider != null:
 		_assign("crow", raider.global_position)
+		return
+	# 0b. go on Crow's Nest when invited
+	if Game.has_flag("nest_invite") and not bool(Game.ceo["deal"]) and world.stations.has("tv_van") and world.nest.cooldown <= 0.0:
+		var van: TvVan = world.stations["tv_van"]
+		_assign("nest", van.pad_pos("carpet"), van)
 		return
 	# 1. crows
 	if not world.crows.is_empty():

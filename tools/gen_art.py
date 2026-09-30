@@ -452,6 +452,26 @@ def runner_icon():
     return g.done()
 
 
+def nest_icon():
+    g = G()
+    g.ell(8, 44, 92, 86, (150, 100, 55, 255))
+    g.ell(18, 40, 82, 66, (110, 70, 35, 255), outline=None)
+    for x in (30, 50, 70):
+        g.ell(x - 11, 26, x + 11, 56, (255, 210, 60, 255), w=3)
+    for a, b2 in (((10, 60), (40, 76)), ((60, 78), (92, 58)), ((20, 72), (56, 84))):
+        g.line([a, b2], (120, 80, 40, 255), 4)
+    return g.done()
+
+
+def globe_icon():
+    g = G()
+    g.ell(8, 8, 92, 92, (80, 150, 230, 255))
+    g.poly([(24, 24), (46, 18), (52, 34), (40, 48), (28, 44)], (110, 200, 90, 255), w=3)
+    g.poly([(56, 46), (76, 40), (84, 58), (70, 78), (58, 70)], (110, 200, 90, 255), w=3)
+    g.poly([(22, 60), (36, 58), (38, 74), (28, 80)], (110, 200, 90, 255), w=3)
+    return g.done()
+
+
 def bubble():
     """Speech bubble for pigeon orders (white, soft outline, tail down)."""
     size = 128
@@ -604,7 +624,7 @@ def main():
         "fx_dot": soft_dot(), "fx_sparkle": sparkle(), "fx_pad": pad_tex(), "fx_zone": zone_tex(),
         "fx_fill": fill_tex(), "fx_card": card_tex(),
         "military": military_icon(), "security": security_icon(), "turret": turret_icon(),
-        "hire_guard": guard_icon(), "hire_runner": runner_icon(),
+        "hire_guard": guard_icon(), "hire_runner": runner_icon(), "nest": nest_icon(), "globe": globe_icon(),
     }
     for name, im in icons.items():
         save(im, "icons", name + ".png")

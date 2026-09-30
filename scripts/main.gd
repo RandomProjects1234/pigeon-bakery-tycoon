@@ -12,6 +12,9 @@ var _clock := 0.0
 
 func _ready() -> void:
 	randomize()
+	if Game.test_mode():
+		# automated test windows pop up on the desktop: ignore stray clicks
+		get_viewport().gui_disable_input = true
 	_mobile_web_tuning()
 	if bool(Game.dev["bake_icons"]):
 		var baker := IconBaker.new()
@@ -176,4 +179,4 @@ func _report() -> void:
 	print("[report] t=%.0fs money=%d earned=%d served=%d unlocked=%d/%d pigeons=%d workers=%d" % [
 		_clock * Engine.time_scale, Game.money, int(Game.stats["earned"]), int(Game.stats["served"]),
 		ids.size(), Layout.ZONES.size(), world.pigeons.size(), world.workers.size()])
-	print("[report] last unlocked: ", ids.slice(maxi(0, ids.size() - 4)))
+	print("[report] last unlocked: ", ids.slice(maxi(0, ids.size() - 4)), " player=", world.player.global_position)

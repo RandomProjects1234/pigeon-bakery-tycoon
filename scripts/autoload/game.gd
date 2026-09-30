@@ -37,6 +37,8 @@ var station_state := {}   # station id -> saved piles etc.
 ## Military contracts: finished/failed counts, reputation with the General,
 ## and the order in progress (so a reload doesn't lose it).
 var military := {"done": 0, "failed": 0, "rep": 0, "order": {}}
+## Crow's Nest / CEO ending: the deal you struck and your global restaurants.
+var ceo := {"deal": false, "investor": "", "amount": 0, "equity": 0, "cities": {}, "seen_end": false}
 var player_pos := Vector2.INF
 var saved_at := 0
 var loaded_from_save := false
@@ -49,7 +51,7 @@ var playing := false      # false while the title menu is up
 var dev := {
 	"autoshot": [], "auto": false, "timescale": 1.0, "fresh": false, "money": -1,
 	"unlock": "", "bake_icons": false, "log": false, "play": false, "shotdir": "res://shots/",
-	"quit_after": -1.0, "cam": "", "pose": "", "menu": false, "allow_save": false, "raid_in": -1.0, "offer_in": -1.0, "show_ui": false,
+	"quit_after": -1.0, "cam": "", "pose": "", "menu": false, "allow_save": false, "raid_in": -1.0, "offer_in": -1.0, "show_ui": false, "nest": false, "nest_now": false,
 }
 
 var _save_timer := 0.0
@@ -263,7 +265,7 @@ func save_game() -> void:
 	var d := {
 		"v": 1, "money": money, "unlocked": unlocked.keys(), "paid": paid, "flags": flags.keys(),
 		"upg": upg, "company": company, "tut": tut, "stats": stats, "settings": settings,
-		"branch": branch, "stations": station_state, "military": military, "saved_at": int(Time.get_unix_time_from_system()),
+		"branch": branch, "stations": station_state, "military": military, "ceo": ceo, "saved_at": int(Time.get_unix_time_from_system()),
 	}
 	if player_pos != Vector2.INF:
 		d["player"] = [player_pos.x, player_pos.y]
@@ -309,6 +311,9 @@ func load_game() -> void:
 	var mil: Dictionary = d.get("military", {})
 	for k in mil:
 		military[k] = mil[k]
+	var c: Dictionary = d.get("ceo", {})
+	for k in c:
+		ceo[k] = c[k]
 	saved_at = int(d.get("saved_at", 0))
 	var pl: Array = d.get("player", [])
 	if pl.size() == 2:
@@ -330,6 +335,7 @@ func wipe_progress(keep_company := true, new_branch := false) -> void:
 	tut = 0
 	station_state = {}
 	military = {"done": 0, "failed": 0, "rep": 0, "order": {}}
+	ceo = {"deal": false, "investor": "", "amount": 0, "equity": 0, "cities": {}, "seen_end": false}
 	player_pos = Vector2.INF
 	settings = settings_keep
 	company = name_keep if keep_company else DEFAULT_COMPANY
@@ -387,6 +393,10 @@ func _parse_args() -> void:
 				dev["allow_save"] = true
 			"--show-ui":
 				dev["show_ui"] = true
+			"--nest":
+				dev["nest"] = true
+			"--nest-now":
+				dev["nest_now"] = true
 			"--raid-in":
 				dev["raid_in"] = float(nxt)
 				i += 1

@@ -24,6 +24,11 @@ var company_label: Label3D
 var menu_mode := true
 var military: Military
 var security: Security
+var nest: CrowsNest
+var _van: TvVan = null
+var _invite_t := 0.0
+var _inviting := false
+var _global_t := 0.0
 
 var _gates := {}
 var _arrow: MeshInstance3D
@@ -48,6 +53,8 @@ func _ready() -> void:
 	Fx.root = self
 	military = Military.new(self)
 	security = Security.new(self)
+	nest = CrowsNest.new(self)
+	add_child(nest)
 	# saves that finished the game before the military update still get General Coo
 	if Game.is_unlocked("statue"):
 		Game.flags["won"] = true
@@ -107,6 +114,14 @@ func _ready() -> void:
 	_ground_arrow.visible = false
 	add_child(_ground_arrow)
 	objectives = Objectives.new(self)
+	if Game.has_flag("nest_invite") and not bool(Game.ceo["deal"]):
+		_spawn_van(false)
+	if bool(Game.ceo["deal"]):
+		_init_cities()
+	if bool(Game.dev["nest_now"]):
+		Game.flags["nest_invite"] = true
+		_spawn_van(false)
+		get_tree().create_timer(2.0, false).timeout.connect(start_nest)
 	Game.zone_unlocked.connect(_on_unlocked)
 	Game.flag_set.connect(func(_f: String) -> void: _refresh_zones(true))
 	Game.company_changed.connect(_on_company_changed)
@@ -199,7 +214,11 @@ func _open_gate(id: String, animate: bool) -> void:
 	_gates.erase(id)
 	var g: Array = Layout.GATES.get(id, [])
 	if g.size() == 2:
-		nav.set_line(g[0], g[1], false, 0.35)
+		# free only the middle of the gap so paths don't clip the fence posts
+		var a: Vector2 = g[0]
+		var b: Vector2 = g[1]
+		var d := (b - a).normalized() * 0.45
+		nav.set_line(a + d, b - d, false, 0.35)
 
 
 ## Creates buy zones that just became visible. Returns the new ones.
@@ -314,6 +333,108 @@ func _general_speech(gen: PigeonRig) -> void:
 		_intro_running = false)
 
 
+# ------------------------------------------------------- Crow's Nest --
+## "Basically finished": every zone bought and a few army orders delivered.
+func game_finished() -> bool:
+	if bool(Game.dev["nest"]):
+		return true
+	for z in Layout.ZONES:
+		if not Game.is_unlocked(str(z["id"])):
+			return false
+	return int(Game.military["done"]) >= 3
+
+
+func _update_nest_invite(delta: float) -> void:
+	if _inviting or not Game.playing or Game.has_flag("nest_invite") or bool(Game.ceo["deal"]):
+		return
+	if not game_finished() or Game.hud == null or bool(Game.hud.call("is_busy")):
+		return
+	if security.raid_active or security.warn_t > 0.0 or military.state == "offer":
+		return
+	_invite_t += delta
+	if _invite_t < 6.0:
+		return
+	_inviting = true
+	Game.log_line("[nest] Producer Pip invites you")
+	var lines: Array[String] = [
+		"Hi hi hi! Producer Pip, from the hit TV show CROW'S NEST!",
+		"Everyone's talking about %s. You fed the whole army AND beat the Crow Clans!" % Game.company,
+		"On Crow's Nest you pitch your business to the richest pigeons in the world. If they invest, you go GLOBAL!",
+		"Our TV van is parked at your military outpost. Walk up the red carpet when you're ready. You're on in five!",
+	]
+	Sfx.play("bugle", -4.0)
+	Game.hud.call("dialog", lines, "Producer Pip", "portrait_producer", func() -> void:
+		Game.set_flag("nest_invite")
+		_spawn_van(true)
+		_inviting = false
+		Game.hud.call("big_card", "Final Update!", "Crow's Nest", "Pitch to rich pigeon investors and take your bakery global.", "nest")
+		Sfx.play("fanfare", -3.0)
+		if _van != null:
+			pan_to(_van.global_position, 1.8))
+
+
+func _spawn_van(animate: bool) -> void:
+	if _van != null:
+		return
+	_van = TvVan.new()
+	add_child(_van)
+	_van.setup(self, {"id": "tv_van", "pos": Vector2(26.8, 3.4)})
+	_register_station(_van)
+	if animate:
+		Fx.pop_in(_van, 0.5)
+		Fx.confetti(_van.global_position + Vector3(0, 1, 0), 60)
+
+
+func start_nest() -> void:
+	if bool(Game.ceo["deal"]) or nest.running:
+		return
+	if nest.cooldown > 0.0:
+		Fx.float_text(player.global_position + Vector3(0, 2.6, 0), "Next season in %ds" % int(nest.cooldown), Color(1, 1, 1), 50)
+		return
+	nest.start()
+
+
+func start_ending() -> void:
+	_init_cities()
+	if _van != null:
+		station_list.erase(_van)
+		stations.erase("tv_van")
+		Fx.poof(_van.global_position + Vector3(0, 1, 0), Color(1, 1, 1), 20, 0.4)
+		_van.queue_free()
+		_van = null
+	var e := Ending.new()
+	get_parent().add_child(e)
+
+
+func _init_cities() -> void:
+	var cities: Dictionary = Game.ceo["cities"]
+	for c in Investors.CITIES:
+		var n := str(c[0])
+		if not cities.has(n):
+			cities[n] = 1
+
+
+## Your share of every restaurant's income worldwide, paid once a second.
+func global_income() -> float:
+	if not bool(Game.ceo["deal"]):
+		return 0.0
+	var total := 0.0
+	var cities: Dictionary = Game.ceo["cities"]
+	for i in Investors.CITIES.size():
+		var lvl := int(cities.get(str(Investors.CITIES[i][0]), 0))
+		total += Investors.city_income(i, lvl)
+	return total * (1.0 - float(Game.ceo["equity"]) / 100.0)
+
+
+func _update_global_income(delta: float) -> void:
+	if not bool(Game.ceo["deal"]) or not bool(Game.ceo["seen_end"]) or not Game.playing:
+		return
+	_global_t += delta
+	if _global_t >= 1.0:
+		_global_t -= 1.0
+		Game.add_money(int(global_income()))
+
+
 func pan_to(p: Vector3, secs: float) -> void:
 	_pan_target = p
 	_pan_time = secs
@@ -421,6 +542,8 @@ func _process(delta: float) -> void:
 	military.tick(delta)
 	security.tick(delta)
 	_update_intro(delta)
+	_update_nest_invite(delta)
+	_update_global_income(delta)
 	_obj_t -= delta
 	if _obj_t <= 0.0:
 		_obj_t = 0.15

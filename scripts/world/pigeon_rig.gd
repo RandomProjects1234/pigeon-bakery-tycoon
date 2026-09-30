@@ -29,19 +29,19 @@ const BODY_Y := 0.39
 
 static func palette(v: String) -> Dictionary:
 	match v:
-		"dark", "general":
+		"dark", "general", "rich_gold":
 			return {"body": Color(0.5, 0.52, 0.57), "belly": Color(0.44, 0.46, 0.5), "wing": Color(0.58, 0.6, 0.65),
 				"neck": Color(0.17, 0.18, 0.21), "head": Color(0.28, 0.3, 0.34), "tail": Color(0.32, 0.33, 0.37),
 				"bar": Color(0.1, 0.1, 0.12), "tip": Color(0.22, 0.23, 0.26), "eye": Color(0.95, 0.45, 0.12),
 				"feet": Color(0.93, 0.47, 0.52), "beak": Color(0.2, 0.2, 0.22), "cere": Color(0.92, 0.9, 0.85),
 				"sheen1": Color(0.22, 0.42, 0.36), "sheen2": Color(0.38, 0.27, 0.46)}
-		"light":
+		"light", "rich_grim", "producer":
 			return {"body": Color(0.76, 0.77, 0.8), "belly": Color(0.68, 0.7, 0.74), "wing": Color(0.84, 0.85, 0.88),
 				"neck": Color(0.33, 0.35, 0.4), "head": Color(0.48, 0.5, 0.55), "tail": Color(0.5, 0.52, 0.57),
 				"bar": Color(0.16, 0.16, 0.18), "tip": Color(0.4, 0.41, 0.45), "eye": Color(0.95, 0.45, 0.12),
 				"feet": Color(0.93, 0.5, 0.55), "beak": Color(0.25, 0.25, 0.27), "cere": Color(0.95, 0.93, 0.9),
 				"sheen1": Color(0.3, 0.5, 0.44), "sheen2": Color(0.46, 0.36, 0.54)}
-		"vip":
+		"vip", "dove":
 			return {"body": Color(0.97, 0.97, 0.98), "belly": Color(0.92, 0.92, 0.94), "wing": Color(1, 1, 1),
 				"neck": Color(0.93, 0.93, 0.95), "head": Color(0.98, 0.98, 1.0), "tail": Color(0.94, 0.94, 0.96),
 				"bar": Color(0.95, 0.78, 0.25), "tip": Color(0.9, 0.9, 0.93), "eye": Color(0.2, 0.15, 0.1),
@@ -161,6 +161,76 @@ func _accessories(v: String) -> void:
 				b.cyl(0.165, 0.165, 0.015, Vector3(0, 0.005, 0), olive.darkened(0.2), Vector3.ZERO, 12)
 				return b.build()), head)
 			helmet.position = Vector3(0, 0.05, -0.01)
+		"rich_hat":   # top hat + monocle
+			var hat := MeshBuilder.node(Models.cached("pg_tophat", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				var black := Color(0.08, 0.08, 0.1)
+				b.cyl(0.19, 0.19, 0.02, Vector3(0, 0, 0), black, Vector3.ZERO, 14)
+				b.cyl(0.11, 0.11, 0.2, Vector3(0, 0.1, 0), black, Vector3.ZERO, 14)
+				b.cyl(0.113, 0.113, 0.04, Vector3(0, 0.03, 0), Color(0.75, 0.12, 0.15), Vector3.ZERO, 14)
+				b.torus(0.04, 0.008, Vector3(0.1, -0.08, -0.08), Models.C_GOLD, Vector3(0, 0, 90))
+				b.cyl(0.003, 0.003, 0.14, Vector3(0.12, -0.15, -0.06), Models.C_GOLD, Vector3(10, 0, 0), 4)
+				return b.build()), head)
+			hat.position = Vector3(0, 0.12, 0)
+		"rich_gold":  # sunglasses + gold chain
+			var shades := MeshBuilder.node(Models.cached("pg_shades", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				var black := Color(0.04, 0.04, 0.05)
+				for side in [-1, 1]:
+					b.box(Vector3(0.02, 0.05, 0.07), Vector3(0.1 * side, 0.035, -0.07), black)
+				b.box(Vector3(0.2, 0.015, 0.015), Vector3(0, 0.055, -0.115), black)
+				return b.build()), head)
+			shades.position = Vector3.ZERO
+			var chain := MeshBuilder.node(Models.cached("pg_chain", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				b.torus(0.14, 0.018, Vector3(0, 0, 0), Models.C_GOLD, Vector3(-60, 0, 0), Vector3(1, 1, 1))
+				b.cyl(0.04, 0.04, 0.02, Vector3(0, -0.07, -0.14), Models.C_GOLD, Vector3(90, 0, 0), 8)
+				return b.build()), body)
+			chain.position = Vector3(0, 0.22, -0.22)
+		"dove":       # pearls + tiara
+			var tiara := MeshBuilder.node(Models.cached("pg_tiara", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				b.torus(0.08, 0.01, Vector3(0, 0, 0), Models.C_GOLD)
+				for k in 3:
+					b.cyl(0.0, 0.02, 0.05 + 0.02 * (1 - absi(k - 1)), Vector3(-0.04 + k * 0.04, 0.03, -0.07), Models.C_GOLD, Vector3.ZERO, 4)
+				b.sphere(0.014, Vector3(0, 0.07, -0.075), Color(0.4, 0.6, 1.0))
+				return b.build()), head)
+			tiara.position = Vector3(0, 0.12, 0)
+			var pearls := MeshBuilder.node(Models.cached("pg_pearls", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				for k in 14:
+					var a := k * TAU / 14.0
+					b.sphere(0.02, Vector3(cos(a) * 0.13, 0, sin(a) * 0.13), Color(0.98, 0.96, 0.92), Vector3.ONE, Vector3.ZERO, 6)
+				return b.build()), body)
+			pearls.position = Vector3(0, 0.22, -0.22)
+			pearls.rotation_degrees = Vector3(-60, 0, 0)
+		"rich_grim", "host":  # glasses (grim) / bow tie (both)
+			if v == "rich_grim":
+				var gl := MeshBuilder.node(Models.cached("pg_glasses", func() -> ArrayMesh:
+					var b := MeshBuilder.new()
+					for side in [-1, 1]:
+						b.torus(0.035, 0.007, Vector3(0.1 * side, 0.035, -0.075), Color(0.1, 0.1, 0.12), Vector3(0, 0, 90))
+					b.box(Vector3(0.12, 0.01, 0.01), Vector3(0, 0.045, -0.12), Color(0.1, 0.1, 0.12))
+					return b.build()), head)
+				gl.position = Vector3.ZERO
+			var tie := MeshBuilder.node(Models.cached("pg_bowtie_" + v, func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				var c := Color(0.08, 0.08, 0.1) if v == "rich_grim" else Color(0.85, 0.15, 0.2)
+				b.prism(Vector3(0.08, 0.07, 0.03), Vector3(-0.045, 0, 0), c, Vector3(0, 0, 90))
+				b.prism(Vector3(0.08, 0.07, 0.03), Vector3(0.045, 0, 0), c, Vector3(0, 0, -90))
+				b.sphere(0.02, Vector3(0, 0, -0.005), c)
+				return b.build()), body)
+			tie.position = Vector3(0, 0.14, -0.35)
+		"producer":   # headset
+			var hs := MeshBuilder.node(Models.cached("pg_headset", func() -> ArrayMesh:
+				var b := MeshBuilder.new()
+				b.torus(0.12, 0.012, Vector3(0, 0.03, 0), Color(0.15, 0.15, 0.18), Vector3(0, 0, 90))
+				for side in [-1, 1]:
+					b.cyl(0.04, 0.04, 0.03, Vector3(0.12 * side, -0.02, 0), Color(0.15, 0.15, 0.18), Vector3(0, 0, 90), 10)
+				b.cyl(0.006, 0.006, 0.12, Vector3(0.1, -0.06, -0.06), Color(0.15, 0.15, 0.18), Vector3(50, 0, 0), 4)
+				b.sphere(0.018, Vector3(0.1, -0.1, -0.11), Color(0.15, 0.15, 0.18))
+				return b.build()), head)
+			hs.position = Vector3(0, 0.05, 0)
 		"crow_boss":
 			var band := MeshBuilder.node(Models.cached("pg_bandana", func() -> ArrayMesh:
 				var b := MeshBuilder.new()

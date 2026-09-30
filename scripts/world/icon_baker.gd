@@ -57,7 +57,7 @@ func _bake() -> void:
 		n.queue_free()
 		await get_tree().process_frame
 	# character portraits for dialogs and the raid banner
-	for v in ["general", "crow_boss"]:
+	for v in ["general", "crow_boss", "rich_hat", "rich_gold", "dove", "rich_grim", "host", "producer"]:
 		var rig := PigeonRig.new(v)
 		vp.add_child(rig)
 		rig.rotation.y = PI - 0.3
@@ -69,7 +69,10 @@ func _bake() -> void:
 			await RenderingServer.frame_post_draw
 		var img2 := vp.get_texture().get_image()
 		img2.resize(128, 128, Image.INTERPOLATE_LANCZOS)
-		var name2 := "portrait_general" if v == "general" else "portrait_crow"
+		var names := {"general": "portrait_general", "crow_boss": "portrait_crow", "rich_hat": "portrait_reginald",
+			"rich_gold": "portrait_goldie", "dove": "portrait_duchess", "rich_grim": "portrait_grim",
+			"host": "portrait_host", "producer": "portrait_producer"}
+		var name2: String = names[v]
 		img2.save_png(ProjectSettings.globalize_path("res://assets/icons/%s.png" % name2))
 		print("[bake] ", name2)
 		rig.queue_free()

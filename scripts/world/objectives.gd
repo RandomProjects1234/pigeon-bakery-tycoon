@@ -24,6 +24,18 @@ func update() -> void:
 	_advance_tutorial(st, player)
 	target = Vector3.INF
 	step_label = ""
+	if bool(Game.ceo["deal"]):
+		text = "CEO: grow your global empire (globe button)"
+		icon = "globe"
+		return
+	if Game.has_flag("nest_invite"):
+		text = "Walk up the red carpet to go on Crow's Nest"
+		icon = "nest"
+		var van: Node3D = st.get("tv_van", null)
+		var nest: CrowsNest = world.get("nest")
+		if van != null and nest != null and nest.cooldown <= 0.0 and not (world.get("security") as Security).raid_active:
+			target = (van as TvVan).pad_pos("carpet")
+			return
 	# raids and military orders come first once they exist
 	var sec: Security = world.get("security")
 	var mil: Military = world.get("military")

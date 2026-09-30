@@ -38,6 +38,9 @@ var _order_rows: VBoxContainer
 var _order_sig := ""
 var _raid_panel: PanelContainer
 var _raid_label: Label
+var _btn_global: Button
+var _global_pill: PanelContainer
+var _global_label: Label
 
 const JOY_R := 70.0
 
@@ -69,6 +72,7 @@ func _ready() -> void:
 	root.add_child(_edge_arrow)
 	_build_hand()
 	_build_military_panels()
+	_build_global_pill()
 	Game.money_changed.connect(_on_money)
 	Game.upgrades_changed.connect(_refresh_upgrades)
 	Game.zone_unlocked.connect(func(_id: String) -> void: _refresh_level())
@@ -188,6 +192,10 @@ func _build_side() -> void:
 	_btn_upgrades = UiKit.icon_button("ui_up", UiKit.GREEN, 66)
 	_btn_upgrades.pressed.connect(open_upgrades)
 	vb.add_child(_btn_upgrades)
+	_btn_global = UiKit.icon_button("globe", UiKit.BLUE, 66)
+	_btn_global.pressed.connect(open_global)
+	vb.add_child(_btn_global)
+	_btn_global.visible = false
 
 
 func _build_objective() -> void:
@@ -242,6 +250,12 @@ func _process(delta: float) -> void:
 			_money_shown = target
 		_money_label.text = Game.fmt(int(round(_money_shown)))
 	_btn_upgrades.visible = Game.is_unlocked("office")
+	var ceo_on := bool(Game.ceo["deal"]) and bool(Game.ceo["seen_end"])
+	_btn_global.visible = ceo_on
+	if _global_pill != null:
+		_global_pill.visible = ceo_on and Game.playing
+		if ceo_on and Game.world != null:
+			_global_label.text = "Global +$%s/s" % Game.fmt(int(Game.world.call("global_income")))
 	_adapt_layout()
 	_update_edge_arrow()
 	_update_hand(delta)
@@ -698,6 +712,94 @@ func show_win() -> void:
 
 
 # ------------------------------------------------ military + security --
+func _build_global_pill() -> void:
+	_global_pill = PanelContainer.new()
+	_global_pill.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_global_pill.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_global_pill.offset_right = -16
+	_global_pill.offset_left = -16
+	_global_pill.offset_top = 88
+	_global_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_global_pill.add_theme_stylebox_override("panel", UiKit.panel_style(Color(0.2, 0.35, 0.7, 0.92), 20))
+	root.add_child(_global_pill)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 6)
+	_global_pill.add_child(hb)
+	hb.add_child(UiKit.tex("globe", 30))
+	_global_label = UiKit.label("", 20, Color(1, 1, 1), 6)
+	hb.add_child(_global_label)
+	_global_pill.visible = false
+
+
+## CEO dashboard: every city's restaurant, upgrade them to grow global income.
+func open_global() -> void:
+	var vb := _open_modal("Global", "GLOBAL HQ", 760)
+	var inv := Investors.by_id(str(Game.ceo["investor"]))
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 12)
+	vb.add_child(head)
+	head.add_child(UiKit.tex(str(inv.get("portrait", "portrait_host")), 70))
+	var info := UiKit.dark_label("", 20)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD
+	info.custom_minimum_size = Vector2(560, 0)
+	head.add_child(info)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(720, 360)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vb.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 6)
+	scroll.add_child(list)
+	var rows: Array[Dictionary] = []
+	var cities: Dictionary = Game.ceo["cities"]
+	var refresh := func() -> void:
+		var total: float = Game.world.call("global_income")
+		info.text = "Co-CEO: %s (%d%% partner)\nYour share of worldwide income: $%s per second" % [
+			str(inv.get("name", "")), int(Game.ceo["equity"]), Game.fmt(int(total))]
+		for r in rows:
+			var i: int = r["i"]
+			var lvl := int(cities.get(str(Investors.CITIES[i][0]), 1))
+			(r["lvl"] as Label).text = "Lv %d  -  $%s/s" % [lvl, Game.fmt(int(Investors.city_income(i, lvl)))]
+			var b: Button = r["btn"]
+			if lvl >= 10:
+				b.text = "MAX"
+				b.disabled = true
+			else:
+				var cost := Investors.upgrade_cost(i, lvl)
+				b.text = "$" + Game.fmt(cost)
+				UiKit.style_button(b, UiKit.GREEN if Game.money >= cost else UiKit.GREY)
+	for i in Investors.CITIES.size():
+		var row := PanelContainer.new()
+		row.add_theme_stylebox_override("panel", UiKit.panel_style(Color(0.93, 0.95, 1.0), 16, 0, Color.BLACK, false))
+		list.add_child(row)
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 10)
+		row.add_child(hb)
+		hb.add_child(UiKit.tex("globe", 40))
+		var name_l := UiKit.dark_label(str(Investors.CITIES[i][0]), 22)
+		name_l.custom_minimum_size = Vector2(200, 0)
+		hb.add_child(name_l)
+		var lvl_l := UiKit.label("", 20, Color(0.35, 0.4, 0.6), 0)
+		lvl_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hb.add_child(lvl_l)
+		var btn := UiKit.button("", UiKit.GREEN, Vector2(150, 50), 20)
+		var idx := i
+		btn.pressed.connect(func() -> void:
+			var city := str(Investors.CITIES[idx][0])
+			var lvl := int(cities.get(city, 1))
+			var cost := Investors.upgrade_cost(idx, lvl)
+			if lvl < 10 and Game.spend(cost):
+				cities[city] = lvl + 1
+				Sfx.play("unlock", -6.0, 1.1)
+				refresh.call()
+			else:
+				Sfx.play("nope", -6.0))
+		hb.add_child(btn)
+		rows.append({"i": i, "lvl": lvl_l, "btn": btn})
+	refresh.call()
+
+
 func _build_military_panels() -> void:
 	_order_panel = PanelContainer.new()
 	_order_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
