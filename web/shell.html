@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<title>$GODOT_PROJECT_NAME</title>
+		<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+body {
+	color: white;
+	background-color: black;
+	overflow: hidden;
+	touch-action: none;
+}
+
+#canvas {
+	display: block;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+/* Keep the control outside the canvas so it also works on the title screen. */
+#fullscreen-button {
+	position: fixed;
+	right: max(12px, env(safe-area-inset-right));
+	bottom: max(12px, env(safe-area-inset-bottom));
+	z-index: 10;
+	min-height: 44px;
+	padding: 10px 16px;
+	border: 2px solid white;
+	border-radius: 14px;
+	background: #8860d0;
+	color: white;
+	box-shadow: 0 3px 0 #533589;
+	font: bold 14px/1.2 Arial, sans-serif;
+	cursor: pointer;
+	touch-action: manipulation;
+}
+
+#fullscreen-button:hover { background: #7550bb; }
+#fullscreen-button:focus-visible { outline: 3px solid #ffca55; outline-offset: 3px; }
+#fullscreen-button:disabled { opacity: 0.65; cursor: wait; }
+#fullscreen-button[hidden], #fullscreen-message[hidden] { display: none; }
+
+#fullscreen-message {
+	position: fixed;
+	right: max(12px, env(safe-area-inset-right));
+	bottom: calc(max(12px, env(safe-area-inset-bottom)) + 58px);
+	z-index: 10;
+	max-width: min(280px, calc(100vw - 48px));
+	padding: 10px 12px;
+	border-radius: 10px;
+	background: #34234f;
+	font: 14px/1.4 Arial, sans-serif;
+}
+
+#status, #status-splash, #status-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+}
+
+#status, #status-splash {
+	top: 0;
+	bottom: 0;
+}
+
+#status {
+	background-color: $GODOT_SPLASH_COLOR;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+}
+
+#status-splash {
+	max-height: 100%;
+	max-width: 100%;
+	margin: auto;
+}
+
+#status-splash.show-image--false {
+	display: none;
+}
+
+#status-splash.fullsize--true {
+	height: 100%;
+	width: 100%;
+	object-fit: contain;
+}
+
+#status-splash.use-filter--false {
+	image-rendering: pixelated;
+}
+
+#status-progress, #status-notice {
+	display: none;
+}
+
+#status-progress {
+	bottom: 10%;
+	width: 50%;
+	margin: 0 auto;
+}
+
+#status-notice {
+	background-color: #5b3943;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+		</style>
+		$GODOT_HEAD_INCLUDE
+	</head>
+	<body>
+		<canvas id="canvas">
+			Your browser does not support the canvas tag.
+		</canvas>
+
+		<noscript>
+			Your browser does not support JavaScript.
+		</noscript>
+
+		<div id="status">
+			<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
+			<progress id="status-progress"></progress>
+			<div id="status-notice"></div>
+		</div>
+
+		<button id="fullscreen-button" type="button" aria-pressed="false" title="Enter fullscreen" hidden>Fullscreen</button>
+		<div id="fullscreen-message" role="status" aria-live="polite" hidden></div>
+		<script>
+(function () {
+	const button = document.getElementById('fullscreen-button');
+	const message = document.getElementById('fullscreen-message');
+	const canvas = document.getElementById('canvas');
+	const page = document.documentElement;
+	const requestFullscreen = page.requestFullscreen || page.webkitRequestFullscreen;
+	const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+	if (!requestFullscreen || !exitFullscreen ||
+		(document.fullscreenEnabled === false && !page.webkitRequestFullscreen)) {
+		return;
+	}
+	button.hidden = false;
+	let messageTimeout;
+
+	function isFullscreen() {
+		return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+	}
+
+	function updateButton() {
+		const active = isFullscreen();
+		button.textContent = active ? 'Exit fullscreen' : 'Fullscreen';
+		button.title = active ? 'Exit fullscreen (Esc)' : 'Enter fullscreen';
+		button.setAttribute('aria-pressed', String(active));
+	}
+
+	function showFailure() {
+		clearTimeout(messageTimeout);
+		message.textContent = 'Fullscreen could not be changed. Try again or use your browser\'s fullscreen option.';
+		message.hidden = false;
+		messageTimeout = setTimeout(() => { message.hidden = true; }, 5000);
+	}
+
+	// Do not pass button touches or keyboard activation through to the game.
+	for (const eventName of ['pointerdown', 'pointerup', 'keydown', 'keyup']) {
+		button.addEventListener(eventName, (event) => event.stopPropagation());
+	}
+	button.addEventListener('click', async (event) => {
+		event.stopPropagation();
+		button.disabled = true;
+		message.hidden = true;
+		try {
+			if (isFullscreen()) {
+				await exitFullscreen.call(document);
+			} else {
+				// Fullscreen the page so the exit control stays available over the game.
+				await requestFullscreen.call(page);
+			}
+			canvas.focus();
+		} catch (error) {
+			showFailure();
+		} finally {
+			button.disabled = false;
+			updateButton();
+		}
+	});
+	document.addEventListener('fullscreenchange', updateButton);
+	document.addEventListener('webkitfullscreenchange', updateButton);
+	document.addEventListener('fullscreenerror', showFailure);
+	document.addEventListener('webkitfullscreenerror', showFailure);
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape' && isFullscreen()) {
+			Promise.resolve(exitFullscreen.call(document)).catch(showFailure);
+		}
+	});
+	updateButton();
+}());
+		</script>
+
+		<script src="$GODOT_URL"></script>
+		<script>
+const GODOT_CONFIG = $GODOT_CONFIG;
+const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
+const engine = new Engine(GODOT_CONFIG);
+
+(function () {
+	const statusOverlay = document.getElementById('status');
+	const statusProgress = document.getElementById('status-progress');
+	const statusNotice = document.getElementById('status-notice');
+
+	let initializing = true;
+	let statusMode = '';
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		const lines = text.split('\n');
+		lines.forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		if (err instanceof Error) {
+			setStatusNotice(err.message);
+		} else if (typeof err === 'string') {
+			setStatusNotice(err);
+		} else {
+			setStatusNotice('An unknown error occurred.');
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+
+	if (missing.length !== 0) {
+		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
+			let serviceWorkerRegistrationPromise;
+			try {
+				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
+			} catch (err) {
+				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
+			}
+			// There's a chance that installing the service worker would fix the issue
+			Promise.race([
+				serviceWorkerRegistrationPromise.then((registration) => {
+					if (registration != null) {
+						return Promise.reject(new Error('Service worker already exists.'));
+					}
+					return registration;
+				}).then(() => engine.installServiceWorker()),
+				// For some reason, `getRegistration()` can stall
+				new Promise((resolve) => {
+					setTimeout(() => resolve(), 2000);
+				}),
+			]).then(() => {
+				// Reload if there was no error.
+				window.location.reload();
+			}).catch((err) => {
+				console.error('Error while registering service worker:', err);
+			});
+		} else {
+			// Display the message as usual
+			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
+			displayFailureNotice(missingMsg + missing.join('\n'));
+		}
+	} else {
+		setStatusMode('progress');
+		engine.startGame({
+			'onProgress': function (current, total) {
+				if (current > 0 && total > 0) {
+					statusProgress.value = current;
+					statusProgress.max = total;
+				} else {
+					statusProgress.removeAttribute('value');
+					statusProgress.removeAttribute('max');
+				}
+			},
+		}).then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+}());
+		</script>
+	</body>
+</html>

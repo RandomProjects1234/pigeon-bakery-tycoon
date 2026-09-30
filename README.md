@@ -29,6 +29,7 @@ Name your company on the title screen (the `?` button picks a random name). You 
 
 - Drag anywhere on the screen for a floating joystick (mouse or touch).
 - WASD or the arrow keys also work.
+- In the browser, use **Fullscreen** in the bottom-right corner to fill your screen. Click **Exit fullscreen** or press **Esc** to leave. The button appears on browsers that support fullscreen.
 - Everything else happens by standing on things.
 
 ## How it plays
@@ -122,6 +123,8 @@ Regenerate assets:
 ## Web build
 
 The web version is Godot's built-in Web export: the `Web` preset in `export_presets.cfg`, with no thread support so it runs on GitHub Pages. Export to `build/web/`, then push that folder (plus an empty `.nojekyll`) to the `gh-pages` branch.
+
+The export uses `web/shell.html` for the page and its fullscreen toggle. Keep that custom shell selected when exporting so future builds retain the control.
 
 ```
 godot --headless --path . --export-release "Web" build/web/index.html
