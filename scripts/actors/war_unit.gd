@@ -108,7 +108,8 @@ func _seed_at(target: WarCrow) -> void:
 	sm.height = 0.2
 	s.mesh = sm
 	s.material_override = HQWeapon.ammo_material(Color(0.95, 0.8, 0.35))
-	war.get("root").add_child(s)
+	s.top_level = true
+	add_child(s)
 	var from := global_position
 	s.global_position = from
 	var dmg := owner_weapon.damage()
@@ -135,7 +136,8 @@ func _shell_at(target: WarCrow) -> void:
 	cm.height = 0.5
 	s.mesh = cm
 	s.material_override = HQWeapon.ammo_material(Color(0.88, 0.58, 0.26))
-	war.get("root").add_child(s)
+	s.top_level = true
+	add_child(s)
 	var from := global_position + Vector3(0, 1.2, 0)
 	s.global_position = from
 	var dmg := owner_weapon.damage()

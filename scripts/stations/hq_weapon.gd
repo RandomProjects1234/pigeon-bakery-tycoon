@@ -224,7 +224,9 @@ func _shockwave() -> void:
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	ring.material_override = m
-	war.get("root").add_child(ring)
+	# Own transient effects so removing the weapon also cleans them up.
+	ring.top_level = true
+	add_child(ring)
 	ring.global_position = global_position + Vector3(0, 1.5, 0)
 	var r := range_m()
 	var tw := ring.create_tween()
@@ -288,7 +290,8 @@ func _shoot(target: WarCrow) -> void:
 			ammo.material_override = ammo_material(Color(0.95, 0.8, 0.35))
 			Sfx.play("twang", -10.0, 1.1, 0.05)
 	ammo.mesh = mesh
-	war.get("root").add_child(ammo)
+	ammo.top_level = true
+	add_child(ammo)
 	ammo.global_position = from
 	var wr: WeakRef = weakref(target)
 	var dmg := damage()
@@ -326,4 +329,5 @@ func _shoot(target: WarCrow) -> void:
 func _exit_tree() -> void:
 	for u in _units:
 		if is_instance_valid(u):
+			u.set_process(false)
 			u.queue_free()

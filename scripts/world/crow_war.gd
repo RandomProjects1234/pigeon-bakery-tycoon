@@ -296,6 +296,22 @@ func upgrade_weapon(slot: int) -> bool:
 	return true
 
 
+func remove_weapon(slot: int) -> bool:
+	if not weapons.has(slot):
+		return false
+	var w: HQWeapon = weapons[slot]
+	weapons.erase(slot)
+	# Detach immediately so its collisions and deployed units stop blocking
+	# the pad before the node is freed at the end of the frame.
+	remove_child(w)
+	w.queue_free()
+	shield_hp = minf(shield_hp, shield_max())
+	_dome.visible = shield_hp > 0.0
+	_save_weapons()
+	Sfx.play("bonk", -6.0)
+	return true
+
+
 func _place_weapon(slot: int, type: String, level: int, animate: bool) -> void:
 	var w := HQWeapon.new()
 	add_child(w)

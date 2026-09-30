@@ -1270,6 +1270,39 @@ func _war_upgrade_menu(cw: CrowWar, slot: int) -> void:
 			refresh.call()
 		else:
 			Sfx.play("nope", -6.0))
+	var remove := UiKit.button("Remove", UiKit.RED, Vector2(260, 58), 24)
+	remove.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	remove.pressed.connect(func() -> void: _confirm_remove_weapon(cw, slot))
+	vb.add_child(remove)
+
+
+func _confirm_remove_weapon(cw: CrowWar, slot: int) -> void:
+	if not cw.weapons.has(slot):
+		close_modal()
+		return
+	var w: HQWeapon = cw.weapons[slot]
+	var weapon_name := str(w.def()["name"])
+	var vb := _open_modal("WarRemove", "REMOVE DEFENCE?", 620)
+	var description := UiKit.dark_label("Remove %s (level %d)?\nThis frees its pad for another defence. No money is refunded." % [weapon_name, w.level], 22)
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD
+	description.custom_minimum_size = Vector2(560, 0)
+	vb.add_child(description)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 14)
+	vb.add_child(row)
+	var cancel := UiKit.button("Keep it", UiKit.GREEN, Vector2(200, 60), 22)
+	cancel.pressed.connect(func() -> void: war_pad_menu(cw, slot))
+	row.add_child(cancel)
+	var confirm := UiKit.button("Remove", UiKit.RED, Vector2(200, 60), 22)
+	confirm.pressed.connect(func() -> void:
+		if cw.remove_weapon(slot):
+			close_modal()
+			toast("%s removed. Pad ready to build!" % weapon_name, "turret")
+		else:
+			close_modal()
+			Sfx.play("nope", -6.0))
+	row.add_child(confirm)
 
 
 func war_command_menu(cw: CrowWar) -> void:

@@ -86,6 +86,7 @@ Along the way you unlock:
   - Pigeon Air Squadron (goggled pigeon fighters);
   - Pigeon Tank Battalion.
 - **Command Center** upgrades: HQ armour, repair crew, your own bonk power, and crow radar.
+- To remove a defence, stand on its pad, choose **Remove**, and confirm. The pad becomes available for another weapon. Removal also clears deployed fighters or tanks and is saved; build and upgrade costs are not refunded.
 - **The finish:** every wave you win knocks the **Crow Clan** meter down and cleans two bombed cities. At 20% the **Crow King** attacks. Beat him and the Clan is destroyed for good. Raids stop everywhere, and it's THE REAL END.
 
 Events:
